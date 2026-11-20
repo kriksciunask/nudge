@@ -62,7 +62,7 @@ This file holds the whole project context. Claude Code reads it automatically wh
 
 - Why a sequence model: a session is a sequence of clicks, like a word is a sequence of letters. Order matters: "cart → remove" (changed their mind) and "remove → cart" have the same counts but opposite meaning. Sessions have different lengths.
 - Main model: Transformer encoder. Each click attends to all other clicks (the attention function from the course workshop: softmax(QKᵀ/√d)V); position embedding keeps the order; output = one probability per session (sigmoid). Attention heatmap shows which click drove the decision (good for the presentation).
-- Alternative specification: RNN (GRU or LSTM). Reads clicks one at a time and keeps a hidden state, in the lecturer's notation (Week 6 slides): H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); final hidden state → sigmoid → probability. Weakness: early clicks fade in long sessions (vanishing gradients).
+- Alternative specification: plain RNN (decided 20 Nov: no GRU/LSTM, because the course does not teach their gate equations). Reads clicks one at a time and keeps a hidden state, in the lecturer's notation (Week 6 slides): H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); final hidden state → sigmoid → probability. Weakness: early clicks fade in long sessions (vanishing gradients).
 - Baselines:
   1. Rule: "discount everyone who adds to cart" (what shops do today).
   2. Logistic regression on counts (number of views, carts, removes, cart value). Ignores order.
@@ -84,7 +84,7 @@ This file holds the whole project context. Claude Code reads it automatically wh
   0. Random: guess "buys" at the real buy rate (the floor).
   1. Industry rule: "left a cart → reminder + 10% to everyone". This is how Hostinger Reach (1 h after abandonment, email, subscribers only), Shopify (default 10 h; optional discount code on every recovery email) and Klaviyo (first email after 4 h, 2–3 emails) work: none of them decides WHO gets the discount. Sources: hostinger.com/support/?p=8204, help.shopify.com/en/manual/discounts/discounts-for-abandoned-checkout-recovery-emails, help.klaviyo.com/hc/en-us/articles/115002779411, klaviyo.com/blog/abandoned-cart-tips (warns repeat discounts train shoppers to wait).
   2. Logistic regression on counts of every word (no order).
-  3. RNN (GRU): required by the course as the alternative specification to the Transformer.
+  3. Plain RNN (Week 6 formula): required by the course as the alternative specification to the Transformer. GRU was tried and removed (not taught).
   4. Transformer (main model).
   Scores: precision, recall, F1, AUC; and money (below).
 - Money (measurable, no invented conversion rates): (a) MARGIN SAVED = discount € the industry rule gives to shoppers who come back and buy anyway, minus what Nudge gives them; (b) SHOPPERS LEFT WITHOUT A NUDGE = people Nudge skipped who did not buy (whether a discount would have converted them is unknown; only an A/B test can say). Any "extra sales from nudging" in the demo is a labelled assumption on a slider.

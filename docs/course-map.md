@@ -27,9 +27,9 @@ Built 20 Nov 2026 from the files in `course/`. Every claim cites a file and a sl
 | Dropout | Dropout | W2 s32; NB5 c14; RS Q10 | `nn.Dropout(0.20)` | WS Transformer uses dropout 0.2. |
 | Early stopping | "Keep the best validation weights" (the words "early stopping" are not found) | NB5 c22; WS c16 | "We keep the model from the lowest point of the orange line" | Keep the epoch with the best valid score. |
 | MLP, activations | Hidden layers, ReLU, nonlinearity | W3 s25–s27; W6 s10–s12; W4 s27 | ReLU(z) = max(0, z); without it "layers collapse into one linear layer" | The feed-forward part of each Transformer block is a small MLP. |
-| RNN | Hidden state | W6 s28; W8 s12; AK p15 | H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); O_t = H_t W_hq + b_q; φ = tanh | Our GRU baseline reads clicks one by one; the final H_T → sigmoid. |
+| RNN | Hidden state | W6 s28; W8 s12; AK p15 | H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); O_t = H_t W_hq + b_q; φ = tanh | Our plain RNN reads clicks one by one; the final H_T → sigmoid. |
 | RNN training | BPTT, vanishing/exploding gradients, clipping | W6 s31; W8 s13; AK p15 | 0.5⁵⁰ ≈ 10⁻¹⁵; g ← min(1, θ/‖g‖) g | Early clicks of long visits fade. |
-| GRU / LSTM | Gated RNNs (named only) | W6 s31; W2 s32; AK p15 ("Chapter 10") | No gate equations found | Gate formulas: not found in the materials. |
+| GRU / LSTM | Gated RNNs (named only) | W6 s31; W2 s32; AK p15 ("Chapter 10") | No gate equations found | Not used in Nudge (decided 20 Nov): not taught, so we keep the plain RNN. |
 | Attention | Queries, keys, values; scaled dot product | W8 s17–s20; WS c5–c6 | softmax(QKᵀ/√d)V; worked example 0.67/0.24/0.09 | Each click looks at every other click. |
 | Multi-head | h heads, concatenate, one linear layer | W8 s23; WS c15 `SelfAttention` | "Like channels in a CNN: many heads, many questions" | Two heads in the workshop model. |
 | Order | Positional encoding (fixed waves or learned) | W8 s25 | p_{i,2j} = sin(i/10000^{2j/d}); X + P | We use the workshop's learned `position_embedding`. |
