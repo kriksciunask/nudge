@@ -1,7 +1,8 @@
 """The shared contract between the data, the model and the demo app.
 
 Each click becomes ONE word (token) that says what kind of click it was, how expensive the product
-was, whether it was seen before in this visit, and how long since the previous click:
+was, whether it was seen before in this visit, and how long since the previous click
+(start / quick <20 s / normal 20-70 s / long 70 s-30 min / away >30 min):
 
     view_expensive_again_long  =  viewed an expensive product, for the 2nd+ time, after a long pause
     cart_cheap_quick           =  added a cheap product to the cart, quickly after the previous click
@@ -25,12 +26,14 @@ PRICE_CHEAP_MAX = 100.0       # price <  100        -> cheap
 PRICE_MID_MAX = 250.0         # 100 <= price < 250  -> mid, else expensive
 # Seconds since the previous click (quartiles were 19 s, 35 s, 69 s).
 GAP_QUICK_MAX = 20.0          # < 20 s              -> quick
-GAP_NORMAL_MAX = 70.0         # 20-70 s             -> normal, else long. First click -> start
+GAP_NORMAL_MAX = 70.0         # 20-70 s             -> normal
+GAP_LONG_MAX = 1800.0         # 70 s-30 min         -> long, else away (left and came back;
+                              # 30 min = the usual web-analytics session timeout). First click -> start
 
 CLICK_TYPES = ["view", "cart"]
 PRICE_BANDS = ["cheap", "mid", "expensive"]
 REPEAT = ["", "again"]
-GAP_BANDS = ["start", "quick", "normal", "long"]
+GAP_BANDS = ["start", "quick", "normal", "long", "away"]
 
 
 def click_token(event: str, price: float, again: bool, seconds_since_prev: float | None) -> str:
@@ -44,8 +47,10 @@ def click_token(event: str, price: float, again: bool, seconds_since_prev: float
         gap = "quick"
     elif seconds_since_prev < GAP_NORMAL_MAX:
         gap = "normal"
-    else:
+    elif seconds_since_prev < GAP_LONG_MAX:
         gap = "long"
+    else:
+        gap = "away"
     parts = [event, band] + (["again"] if again else []) + [gap]
     return "_".join(parts)
 

@@ -99,7 +99,7 @@ Building training data: group events by session, sort by time, turn each event i
 
 ## The shared contract
 
-- A session is a Python list of click words in time order. Each click = one word: type (view/cart) + price band (cheap <€100 / mid / expensive ≥€250) + `again` if the product was already seen this visit + time since previous click (start / quick <20 s / normal / long ≥70 s), e.g. ["view_expensive_start", "view_expensive_again_long", "cart_expensive_again_quick"]. 48 possible words. Purchase is never part of the input.
+- A session is a Python list of click words in time order. Each click = one word: type (view/cart) + price band (cheap <€100 / mid / expensive ≥€250) + `again` if the product was already seen this visit + time since previous click (start / quick <20 s / normal 20–70 s / long 70 s–30 min / away >30 min), e.g. ["view_expensive_start", "view_expensive_again_long", "cart_expensive_again_quick"]. 60 possible words. Purchase is never part of the input.
 - Decided 20 Nov: the multi-category data has NO remove_from_cart (checked on all of October 2019), and 56% of buyers never add to cart first, so plain view/cart words were too poor. `tokens_from_clicks` / `build_sessions` in contract.py build the words; the app uses the same function. Remove exists in the demo only as a UI convenience and is not sent to the model.
 - One function connects model and app: predict(session: list[str]) -> float (chance to buy, 0 to 1).
 - Until the real model exists, predict is a clearly marked placeholder so the app can be built in parallel.
@@ -188,6 +188,7 @@ Every member must be able to explain the whole model. Around 2 December each per
 - 20 Nov: local repo structure created (README, CLAUDE.md, .gitignore, requirements.txt, data/README.md, nudge/contract.py with PLACEHOLDER predict, nudge/decision.py, 5 notebook stubs, app/app.py demo shell).
 - 20 Nov: private repo https://github.com/kriksciunask/nudge created and pushed. Local .venv (Python 3.13, torch 2.15 CPU, streamlit 1.67) installed; app tested (opens, click-through works).
 - 20 Nov: Kaggle API set up (token in ~/.kaggle/access_token, user kriksciunas). 01_data ran on Kaggle (private notebook kriksciunas/nudge-01-data): October 2019, 1 in 150 users -> 281,621 clicks, 60,986 sessions, in data/sample/. Findings: no remove_from_cart; 6.5% of sessions buy; buyers with a cart first 44%; one-click sessions 37%; buy rate 10.4% if a product was viewed again vs 3.4% if not; cart sessions 48.6%. Columns missing: category_code 33%, brand 14%, rest 0%.
+- 20 Nov: added `away` ending (gap >30 min; visit ids don't reset, longest in-visit gap 333 h). Buy rate of visits with: quick 9.7%, normal 7.4%, long 6.4%, away 5.7%, so quick clicking goes with buying, not long pauses.
 - 20 Nov decision: main model on multi-category with richer click words (see contract). Cosmetics shop = second-shop test (has remove_from_cart). Coveo skipped (sign-up wait, hashed products).
 - NEXT:
   1. Teammates accept the GitHub invites (sent 20 Nov, write access: ulapask, gusteruzgaite, jokubasspir-ops, bukauskaiteliepa-glitch).
