@@ -185,7 +185,7 @@ Every member must be able to explain the whole model. Around 2 December each per
 
 - 20 Nov: idea, datasets and plan decided. Shared plan doc: https://claude.ai/artifact/34NsQF3WLAiJPVRyCwgVV4
 - 20 Nov: local repo structure created (README, CLAUDE.md, .gitignore, requirements.txt, data/README.md, nudge/contract.py with PLACEHOLDER predict, nudge/decision.py, 5 notebook stubs, app/app.py demo shell).
+- 20 Nov: private repo https://github.com/kriksciunask/nudge created and pushed. Local .venv (Python 3.13, torch 2.15 CPU, streamlit 1.67) installed; app tested (opens, click-through works).
 - NEXT:
-  1. Create the PRIVATE GitHub repo `nudge`, push, invite the 4 teammates (needs Kristupas's OK and their usernames).
-  2. Give teammates the clone/run commands (in README).
-  3. Set up the Kaggle notebook for 01_data (first check: does remove_from_cart exist?).
+  1. Teammates accept the GitHub invites (sent 20 Nov, write access: ulapask, gusteruzgaite, jokubasspir-ops, bukauskaiteliepa-glitch).
+  2. Set up the Kaggle notebook for 01_data (first check: does remove_from_cart exist?).
