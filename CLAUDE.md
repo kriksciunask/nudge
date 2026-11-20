@@ -74,6 +74,15 @@ This file holds the whole project context. Claude Code reads it automatically wh
   3. Bought later on another device: labelled as a non-buyer.
   4. Very long, indecisive sessions.
   5. Expensive products, where hesitation looks different.
+- Agreed comparison ladder (20 Nov), every model scored on the same test shoppers:
+  0. Random: guess "buys" at the real buy rate (the floor).
+  1. Industry rule: "left a cart → reminder + 10% to everyone". This is how Hostinger Reach (1 h after abandonment, email, subscribers only), Shopify (default 10 h; optional discount code on every recovery email) and Klaviyo (first email after 4 h, 2–3 emails) work: none of them decides WHO gets the discount. Sources: hostinger.com/support/?p=8204, help.shopify.com/en/manual/discounts/discounts-for-abandoned-checkout-recovery-emails, help.klaviyo.com/hc/en-us/articles/115002779411, klaviyo.com/blog/abandoned-cart-tips (warns repeat discounts train shoppers to wait).
+  2. Logistic regression on counts of every word (no order).
+  3. RNN (GRU): required by the course as the alternative specification to the Transformer.
+  4. Transformer (main model).
+  Scores: precision, recall, F1, AUC; and money (below).
+- Money (measurable, no invented conversion rates): (a) MARGIN SAVED = discount € the industry rule gives to shoppers who come back and buy anyway, minus what Nudge gives them; (b) SHOPPERS LEFT WITHOUT A NUDGE = people Nudge skipped who did not buy (whether a discount would have converted them is unknown; only an A/B test can say). Any "extra sales from nudging" in the demo is a labelled assumption on a slider.
+- DECIDED 20 Nov (Kristupas): label = 7-day come-back. Implemented as `build_comeback_sessions` in nudge/contract.py. October sample: 44,770 abandoned visits, 10.6% come back and buy within 7 days; cart abandoners 26.8% (median 1.4 days); returning shoppers 14.1% vs new 4.4%. Old same-visit label (`build_sessions`) kept only for reference. Definition: score only visits that END WITHOUT a purchase (when a real flow would fire); label 1 if the same shopper buys within 7 days in a later visit (no messages exist in the data, so that is truly "without help"). Matches "would they come back and buy anyway?" and turns failure #3 into the main question.
 - Honest limitation for Q&A: Nudge predicts who buys; proving that the discount itself causes extra sales needs an A/B test (some people randomly get the discount). Propose that Hostinger runs it as the next step.
 
 ## Data
@@ -99,7 +108,7 @@ Building training data: group events by session, sort by time, turn each event i
 
 ## The shared contract
 
-- A session is a Python list of click words in time order. Each click = one word: type (view/cart) + price band (cheap <€100 / mid / expensive ≥€250) + `again` if the product was already seen this visit + time since previous click (start / quick <20 s / normal 20–70 s / long 70 s–30 min / away >30 min), e.g. ["view_expensive_start", "view_expensive_again_long", "cart_expensive_again_quick"]. 60 possible words. Purchase is never part of the input.
+- A session is a Python list of click words in time order. Each click = one word: type (view/cart) + price band (cheap <€100 / mid / expensive ≥€250) + `again` if the product was already seen this visit + time since previous click (start / quick <20 s / normal 20–70 s / long 70 s–30 min / away >30 min), e.g. ["returning", "view_expensive_start", "view_expensive_again_long", "cart_expensive_again_quick"]. The first word is always "new" or "returning". 62 possible words (2 start words + 60 click words). Purchase is never part of the input.
 - Decided 20 Nov: the multi-category data has NO remove_from_cart (checked on all of October 2019), and 56% of buyers never add to cart first, so plain view/cart words were too poor. `tokens_from_clicks` / `build_sessions` in contract.py build the words; the app uses the same function. Remove exists in the demo only as a UI convenience and is not sent to the model.
 - One function connects model and app: predict(session: list[str]) -> float (chance to buy, 0 to 1).
 - Until the real model exists, predict is a clearly marked placeholder so the app can be built in parallel.
@@ -113,6 +122,7 @@ Building training data: group events by session, sort by time, turn each event i
 - A "how generous are you with discounts" slider moves the cut-offs; a chart shows profit vs "discount everyone".
 - "Look inside": attention heatmap of the Transformer.
 - Optional if reliable by 1 December: send the message for real to a group member's phone. Otherwise the preview is enough. In the pitch, one line: production needs customer opt-in and the WhatsApp Business API.
+- Planned upgrade (idea 20 Nov, build AFTER the model is trained): two screens. (1) Shop owner setup: discount size, margin, generosity, possibly products/prices, channel, tracking switches. Which settings to offer is decided from what the trained model actually relies on. (2) Shopper: probability line that updates after EVERY click, with shaded zones (just browsing / discount zone / no discount needed), then the message on leaving. Honest framing: the model was trained on the shop's history; setup only sets business rules on top (no live training). Links to docs/tracking.md.
 - Keep a recorded backup video of the demo. Test with people outside the group before 10 December.
 
 ## Repo structure
@@ -190,6 +200,25 @@ Every member must be able to explain the whole model. Around 2 December each per
 - 20 Nov: Kaggle API set up (token in ~/.kaggle/access_token, user kriksciunas). 01_data ran on Kaggle (private notebook kriksciunas/nudge-01-data): October 2019, 1 in 150 users -> 281,621 clicks, 60,986 sessions, in data/sample/. Findings: no remove_from_cart; 6.5% of sessions buy; buyers with a cart first 44%; one-click sessions 37%; buy rate 10.4% if a product was viewed again vs 3.4% if not; cart sessions 48.6%. Columns missing: category_code 33%, brand 14%, rest 0%.
 - 20 Nov: added `away` ending (gap >30 min; visit ids don't reset, longest in-visit gap 333 h). Buy rate of visits with: quick 9.7%, normal 7.4%, long 6.4%, away 5.7%, so quick clicking goes with buying, not long pauses.
 - 20 Nov decision: main model on multi-category with richer click words (see contract). Cosmetics shop = second-shop test (has remove_from_cart). Coveo skipped (sign-up wait, hashed products).
+- 20 Nov decisions (Kristupas):
+  - Data: 1 in 10 shoppers (user_id % 10 == 0), October AND November 2019. Built on Kaggle by notebooks/01_data_build.ipynb (kernel kriksciunas/nudge-01-data-build). Full files (~250 MB) go to data/raw/ (gitignored); data/sample/ keeps a small sample for the team.
+  - Split: by shopper, both months mixed, from a hash of user_id: 80% train / 10% valid / 10% test. Extra robustness check: train on October only, test on November (month shift, Black Friday).
+  - Start word: every visit begins with "new" or "returning" (earlier visit in the data). Demo has a "Customer has visited before" toggle. Hour and category NOT added.
+  - One-click visits stay in training; their results are reported separately (failure #1).
+  - All training runs on Kristupas's Mac (Apple M3, 16 GB). Kaggle only builds the data.
+  - Fair baseline: logistic regression gets counts of every word, so any Transformer gain comes from order. If the Transformer barely wins, that is an honest finding, not a failure.
+- 20 Nov DATA AUDIT (independent reviewer) and fixes, all built into `build_visits` in nudge/contract.py, tested by tests/test_contract.py:
+  - A VISIT = a shopper's clicks with no gap over 60 min (shop session ids never reset; one lasted 16 days). Decision moment = last click + 60 min (= when Hostinger Reach emails). A purchase inside that hour = same visit, not scored. (Before: 15% of "came back" cases bought within the first hour.)
+  - LABEL = same shopper buys within 7 days after the decision moment (no messages in the data, so "without help"). Visits without a full 7-day window are dropped.
+  - RETURNING = a visit in the previous 14 days; only visits from Oct 15 on are scored (Oct 1–14 = history only). Before, "returning" rose with the date (40% → 72%); now steady 62–73% per week.
+  - MONEY: cart value counts each carted product once; `next_order_value` = what they actually bought when they came back (only ~half buy something from the abandoned cart). Planned evaluation rule: at most one discount per shopper per 7 days for every model.
+  - CLEANING: exact duplicates removed, price ≤ 0 removed, same-second clicks ordered view < cart < purchase.
+  - SPLIT: md5 of user_id (stable on every computer): 80% train / 10% valid / 10% test; 0 shoppers in two splits.
+  - DEMO: a cart click without a view first now records the view (otherwise the model gets words it never saw).
+  - Still to do in evaluation: bootstrap uncertainty (by shopper) on every number; Oct→Nov check trains only on visits deciding by Oct 24; failure #3 becomes "shoppers who are not logged in are invisible".
+  - Training on the Mac: try CPU vs MPS for one epoch; cut visits to the last 64 words; seeds saved with model.pt; DataLoader num_workers=0; one heavy job at a time.
+- 20 Nov FULL DATA (scripts/build_training_data.py, 25 s on the Mac): 1,166,494 abandoned visits from 1 in 10 shoppers (Oct 15–Nov 23 decisions); 8.6% come back and buy within 7 days; cart abandoners 89,417 with 21.1% coming back anyway; returning 11.5% vs new 3.3%; October 7.4% vs November 9.3%. Words per visit p50 4, p99 45. data/raw/visits_10pct.parquet (36 MB, not in git); team sample data/sample/visits_sample.parquet (1 in 150 shoppers).
 - NEXT:
   1. Teammates accept the GitHub invites (sent 20 Nov, write access: ulapask, gusteruzgaite, jokubasspir-ops, bukauskaiteliepa-glitch).
-  2. 02_baselines: rule baseline + logistic regression on counts, on data/sample/sessions_sample.parquet, split by user.
+  2. 02_baselines: random, industry rule, logistic regression on word counts; full data data/raw/visits_10pct.parquet, use the `split` column; pick cut-offs on valid only.
+  3. Update scripts/make_explorer_data.py and the Data Explorer page to the new visits (it still calls the removed build_sessions).

@@ -14,7 +14,7 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from nudge.contract import IS_PLACEHOLDER, predict, tokens_from_clicks  # noqa: E402
+from nudge.contract import IS_PLACEHOLDER, predict, session_words  # noqa: E402
 from nudge.decision import (  # noqa: E402
     DISCOUNT,
     DISCOUNT_RATE,
@@ -51,9 +51,13 @@ def click(event: str, pid: str) -> None:
     if event == "remove":
         st.session_state.cart.remove(pid)
     else:
-        st.session_state.clicks.append(
-            {"event": event, "product_id": pid, "price": BY_ID[pid]["price"], "time": time.time()}
-        )
+        now = time.time()
+        if event == "cart" and all(c["product_id"] != pid for c in st.session_state.clicks):
+            # Real shoppers almost always open a product before adding it (99.6% in the data), so the
+            # model has barely seen a cart without a view. Record the product view first.
+            st.session_state.clicks.append({"event": "view", "product_id": pid, "price": BY_ID[pid]["price"], "time": now})
+            now += 1
+        st.session_state.clicks.append({"event": event, "product_id": pid, "price": BY_ID[pid]["price"], "time": now})
         if event == "cart":
             st.session_state.cart.append(pid)
     st.session_state.left = False
@@ -75,6 +79,7 @@ with st.sidebar:
         f"{low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%}  \n"
         f"Above **{high:.0%}**: reminder only"
     )
+    returning = st.toggle("Customer has visited before", value=False)
     st.button("New visitor (reset)", on_click=reset, use_container_width=True)
 
 st.title("🛒 Nudge demo shop")
@@ -100,9 +105,10 @@ for i, p in enumerate(PRODUCTS):
 
 # --- Live click sequence ---------------------------------------------------------------
 st.subheader("Your clicks so far")
-session = tokens_from_clicks(st.session_state.clicks)
-if session:
-    st.write(" → ".join(f"{BY_ID[c['product_id']]['icon']} `{w}`" for c, w in zip(st.session_state.clicks, session)))
+session = session_words(st.session_state.clicks, returning)
+if st.session_state.clicks:
+    st.write(f"`{session[0]}` → " + " → ".join(
+        f"{BY_ID[c['product_id']]['icon']} `{w}`" for c, w in zip(st.session_state.clicks, session[1:])))
     st.caption("Each click becomes one word: type, price band, 'again' if seen before, time since previous click.")
 else:
     st.caption("No clicks yet.")
@@ -121,7 +127,7 @@ if st.session_state.left:
 
     with left_col:
         st.subheader("What Nudge decides")
-        st.metric("Chance to buy without help", f"{p:.0%}")
+        st.metric("Chance they come back and buy within 7 days, without a message", f"{p:.0%}")
         st.write(f"**Decision:** {LABELS[action]}")
         if action == DISCOUNT and cart_value:
             waste = expected_wasted_discount(p, cart_value)

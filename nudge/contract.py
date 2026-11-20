@@ -7,7 +7,12 @@ was, whether it was seen before in this visit, and how long since the previous c
     view_expensive_again_long  =  viewed an expensive product, for the 2nd+ time, after a long pause
     cart_cheap_quick           =  added a cheap product to the cart, quickly after the previous click
 
-A session is the list of these words in time order. Purchase is never part of the input: we predict it.
+A session starts with one word about the shopper, "new" or "returning" (had a visit in the previous 14 days),
+followed by the click words in time order:
+
+    ["returning", "view_expensive_start", "view_expensive_again_long", "cart_expensive_again_quick"]
+
+Purchase is never part of the input: we predict it.
 
     predict(session) -> float   chance (0 to 1) that the shopper buys without help
 
@@ -15,8 +20,11 @@ The data has no remove_from_cart clicks (checked 20 Nov on the whole of October 
 so the click types are only view and cart.
 """
 
+import hashlib
 import itertools
 import math
+
+import numpy as np
 
 import pandas as pd
 
@@ -55,8 +63,10 @@ def click_token(event: str, price: float, again: bool, seconds_since_prev: float
     return "_".join(parts)
 
 
+START_WORDS = ["new", "returning"]
+
 # --- Vocabulary: every possible word gets a number (index 0 = padding) ------------------------------
-VOCAB = ["<pad>"] + [
+VOCAB = ["<pad>"] + START_WORDS + [
     "_".join(p for p in (e, b, r, g) if p)
     for e, b, r, g in itertools.product(CLICK_TYPES, PRICE_BANDS, REPEAT, GAP_BANDS)
 ]
@@ -84,42 +94,105 @@ def tokens_from_clicks(clicks: list[dict]) -> list[str]:
     return words
 
 
-def build_sessions(events: pd.DataFrame) -> pd.DataFrame:
-    """Raw clicks (one row per click, REES46 columns) -> one row per session with words and a label.
+def session_words(clicks: list[dict], returning: bool) -> list[str]:
+    """The full model input for one visit: start word + click words. Used by the app."""
+    return ["returning" if returning else "new"] + tokens_from_clicks(clicks)
 
-    Sort each session by time. If it contains a purchase, keep only the clicks BEFORE the first purchase
-    and label 1 (the model must never see the purchase). Otherwise keep all clicks and label 0.
-    Sessions that start with a purchase are dropped (nothing to predict from).
+
+# --- Building the training data (rules decided 20 Nov after the data audit) -------------------------
+IDLE_MINUTES = 60      # a visit ends after 60 min without a click (= when Hostinger Reach would send its email)
+WINDOW_DAYS = 7        # label: did the shopper come back and buy within 7 days of that moment?
+LOOKBACK_DAYS = 14     # "returning" = had a visit in the 14 days before this one
+EVENT_ORDER = {"view": 0, "cart": 1, "purchase": 2}   # fixed order for clicks with the same timestamp
+
+
+def clean_events(events: pd.DataFrame) -> pd.DataFrame:
+    """Raw REES46 rows -> clean clicks sorted per shopper: exact duplicates removed, price <= 0 removed,
+    ties in time ordered view < cart < purchase. Adds `time` (datetime) and `t` (seconds since 1970)."""
+    ev = events.drop_duplicates(subset=["event_time", "event_type", "product_id", "user_id", "user_session"]).copy()
+    ev = ev[ev["price"] > 0]
+    ev["event_type"] = ev["event_type"].astype(str)
+    ev["time"] = pd.to_datetime(ev["event_time"].astype(str).str.replace(" UTC", "", regex=False))
+    ev["t"] = (ev["time"] - pd.Timestamp("1970-01-01")).dt.total_seconds()
+    ev["rank"] = ev["event_type"].map(EVENT_ORDER)
+    ev = ev.sort_values(["user_id", "time", "rank"], kind="stable").reset_index(drop=True)
+    return ev
+
+
+def build_visits(events: pd.DataFrame) -> pd.DataFrame:
+    """Clean clicks -> one row per ABANDONED visit, with words, label and money columns.
+
+    1. A visit = a shopper's clicks with no gap longer than IDLE_MINUTES (we ignore the shop's own
+       session id, which does not reset when people leave).
+    2. Visits that contain a purchase are not scored (the shopper bought; no message would be sent).
+       A purchase within IDLE_MINUTES of the last click is, by rule 1, part of the same visit.
+    3. Decision moment = last click + IDLE_MINUTES. Label 1 if the same shopper buys within WINDOW_DAYS
+       after that moment (the data has no messages, so this is "without help").
+    4. Start word "returning" if the shopper had any visit starting in the LOOKBACK_DAYS before this one.
+    5. Only visits we can judge fairly are kept: start at least LOOKBACK_DAYS after the data starts
+       (full history), and decision moment + WINDOW_DAYS before the data ends (full label window).
+    Money columns: `cart_value` counts each carted product once; `order_value` = total of the purchases
+    in the visit where the shopper came back and bought (what a discount would really apply to).
     """
-    ev = events.copy()
-    ev["time"] = pd.to_datetime(ev["event_time"].str.replace(" UTC", "", regex=False))
-    ev = ev.sort_values(["user_session", "time"], kind="stable")
-    rows = []
-    for session_id, g in ev.groupby("user_session", sort=False):
-        types = g["event_type"].tolist()
-        label = int("purchase" in types)
-        if label:
-            g = g.iloc[: types.index("purchase")]
-        if len(g) == 0:
-            continue
-        clicks = [
-            {"event": e, "product_id": p, "price": pr, "time": t}
-            for e, p, pr, t in zip(g["event_type"], g["product_id"], g["price"], g["time"])
-        ]
-        rows.append({
-            "user_session": session_id,
-            "user_id": int(g["user_id"].iloc[0]),
-            "start_time": g["time"].iloc[0],
-            "tokens": tokens_from_clicks(clicks),
-            "n_clicks": len(g),
-            "cart_value": float(g.loc[g["event_type"] == "cart", "price"].sum()),
-            "label": label,
-        })
-    return pd.DataFrame(rows)
+    ev = clean_events(events)
+    user = ev["user_id"].to_numpy()
+    t = ev["t"].to_numpy()
+    new_visit = np.ones(len(ev), dtype=bool)
+    new_visit[1:] = (user[1:] != user[:-1]) | (t[1:] - t[:-1] > IDLE_MINUTES * 60)
+    ev["visit"] = np.cumsum(new_visit) - 1
+
+    is_buy = ev["event_type"].to_numpy() == "purchase"
+    v = ev.groupby("visit", sort=True).agg(user_id=("user_id", "first"), start=("t", "min"), last=("t", "max"),
+                                            n_clicks=("t", "size"))
+    v["has_purchase"] = pd.Series(is_buy).groupby(ev["visit"]).any()
+    v["order_value"] = ev["price"].where(is_buy, 0.0).groupby(ev["visit"]).sum()
+
+    # Start word: any visit by the same shopper starting in the previous LOOKBACK_DAYS
+    prev_start = v.groupby("user_id")["start"].shift(1)
+    v["returning"] = (v["start"] - prev_start) <= LOOKBACK_DAYS * 86400
+
+    # Label: first later visit WITH a purchase, starting after the decision moment
+    v["decide"] = v["last"] + IDLE_MINUTES * 60
+    buys = v.loc[v["has_purchase"], ["user_id", "start", "order_value"]].rename(
+        columns={"start": "buy_start", "order_value": "next_order_value"}).sort_values("buy_start")
+    a = v.loc[~v["has_purchase"]].reset_index().sort_values("decide")
+    a = pd.merge_asof(a, buys, left_on="decide", right_on="buy_start", by="user_id", direction="forward")
+    a["days_to_buy"] = (a["buy_start"] - a["decide"]) / 86400
+    a["label"] = (a["days_to_buy"] <= WINDOW_DAYS).astype(int)
+    a.loc[a["label"] == 0, ["days_to_buy", "next_order_value"]] = np.nan
+
+    data_start, data_end = t.min(), t.max()
+    keep = (a["start"] >= data_start + LOOKBACK_DAYS * 86400) & (a["decide"] + WINDOW_DAYS * 86400 <= data_end)
+    a = a.loc[keep].sort_values("visit").reset_index(drop=True)
+
+    # Words for the kept visits (same tokens_from_clicks as the demo app)
+    bounds = np.searchsorted(ev["visit"].to_numpy(), np.r_[a["visit"].to_numpy(), a["visit"].to_numpy() + 1])
+    lo, hi = bounds[: len(a)], bounds[len(a):]
+    et, pid, pr = ev["event_type"].to_numpy(), ev["product_id"].to_numpy(), ev["price"].to_numpy()
+    tokens, cart_values = [], []
+    for i, j, ret in zip(lo, hi, a["returning"].to_numpy()):
+        clicks = [{"event": et[k], "product_id": pid[k], "price": pr[k], "time": t[k]} for k in range(i, j)]
+        tokens.append(["returning" if ret else "new"] + tokens_from_clicks(clicks))
+        carted = {pid[k]: pr[k] for k in range(i, j) if et[k] == "cart"}
+        cart_values.append(float(sum(carted.values())))
+    a["tokens"] = tokens
+    a["cart_value"] = cart_values
+    a["start_time"] = pd.to_datetime(a["start"], unit="s")
+    a["decide_time"] = pd.to_datetime(a["decide"], unit="s")
+    a["split"] = split_of(a["user_id"])
+    return a[["visit", "user_id", "start_time", "decide_time", "tokens", "n_clicks", "cart_value",
+              "label", "days_to_buy", "next_order_value", "split"]]
+
+
+def split_of(user_ids: pd.Series) -> pd.Series:
+    """Fixed train/valid/test group per shopper from an md5 hash of the id (stable on every computer):
+    0-7 train (80%), 8 valid (10%), 9 test (10%)."""
+    digit = user_ids.astype(str).map(lambda u: int(hashlib.md5(u.encode()).hexdigest(), 16) % 10)
+    return digit.map(lambda d: "train" if d < 8 else "valid" if d == 8 else "test")
 
 
 def encode(session: list[str]) -> list[int]:
-    """Words -> numbers for the model, e.g. ["view_cheap_start"] -> [1]."""
+    """Words -> numbers for the model, e.g. ["new", "view_cheap_start"] -> [1, 3]."""
     unknown = [w for w in session if w not in TOKEN_TO_ID or w == "<pad>"]
     if unknown:
         raise ValueError(f"Unknown words {unknown}")
@@ -127,20 +200,21 @@ def encode(session: list[str]) -> list[int]:
 
 
 def predict(session: list[str]) -> float:
-    """Chance (0 to 1) that this session ends in a purchase without a nudge.
+    """Chance (0 to 1) that this shopper, leaving now, comes back and buys within 7 days WITHOUT a message.
 
     >>> PLACEHOLDER <<<  This is a hand-written rule, NOT the trained model.
     It exists only so the app can be built before the Transformer is trained.
     Replace the body with: load app/model.pt, encode(session), run the model, sigmoid.
     """
     encode(session)  # validates the words
+    back = "returning" in session
+    session = [w for w in session if w not in START_WORDS]
     if not session:
         return 0.02
-    score = -2.8
+    score = -2.8 + (0.8 if back else 0.0)
     score += 0.05 * min(len(session), 20)
     score += 1.2 * sum(w.startswith("cart") for w in session)
     score += 0.4 * sum("_again" in w for w in session)
-    score += 0.2 * sum(w.endswith("_long") for w in session)
     if session[-1].startswith("cart"):
         score += 0.5
     return 1 / (1 + math.exp(-score))
