@@ -65,7 +65,7 @@ This file holds the whole project context. Claude Code reads it automatically wh
 - Alternative specification: plain RNN (decided 20 Nov: no GRU/LSTM, because the course does not teach their gate equations). Reads clicks one at a time and keeps a hidden state, in the lecturer's notation (Week 6 slides): H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); final hidden state → sigmoid → probability. Weakness: early clicks fade in long sessions (vanishing gradients).
 - Baselines:
   1. Rule: "discount everyone who adds to cart" (what shops do today).
-  2. Logistic regression on counts (number of views, carts, removes, cart value). Ignores order.
+  2. Logistic regression on counts of every click word (62 words). Ignores order. Built in PyTorch as nn.Linear + sigmoid to match the course; scikit-learn only as a cross-check.
 - Story of the comparison: does order matter (RNN vs counts)? Do long sessions matter (Transformer vs RNN, compare on short vs long sessions)?
 - Reuse: the course workshop (Part 1, name generator) has a working small Transformer in PyTorch (NameGPT: attention, causal_mask, SelfAttention, Block) and a Streamlit app.py. Kristupas has these files; reuse the structure, but change the task from "predict the next letter" to "one yes/no per session". For whole-session classification a causal mask is not required.
 
@@ -147,7 +147,7 @@ nudge/  (repo root)
   app/model.pt         trained model
 ```
 
-- Heavy data work and training: Kaggle Notebooks (dataset attached directly, free GPU). Save the notebooks into the repo.
+- Kaggle only extracts the raw clicks (01_data_build). Visits are built and ALL models are trained on Kristupas's Mac (decided 20 Nov). Save the notebooks into the repo.
 - Never commit data files. Commit and push at the end of every working session.
 - Local Python: use 3.12 or 3.13 (PyTorch may not support 3.15 yet). On Kristupas's Mac: `python3.13`.
 
@@ -224,6 +224,9 @@ Every member must be able to explain the whole model. Around 2 December each per
   - Still to do in evaluation: bootstrap uncertainty (by shopper) on every number; Oct→Nov check trains only on visits deciding by Oct 24; failure #3 becomes "shoppers who are not logged in are invisible".
   - Training on the Mac: try CPU vs MPS for one epoch; cut visits to the last 64 words; seeds saved with model.pt; DataLoader num_workers=0; one heavy job at a time.
 - 20 Nov FULL DATA (scripts/build_training_data.py, 25 s on the Mac): 1,166,494 abandoned visits from 1 in 10 shoppers (Oct 15–Nov 23 decisions); 8.6% come back and buy within 7 days; cart abandoners 89,417 with 21.1% coming back anyway; returning 11.5% vs new 3.3%; October 7.4% vs November 9.3%. Words per visit p50 4, p99 45. data/raw/visits_10pct.parquet (36 MB, not in git); team sample data/sample/visits_sample.parquet (1 in 150 shoppers).
+- 20 Nov MODELS (all on the same 117,531 test visits, see docs/PROJECT_LOG.md): industry rule AUC 0.558; logistic regression 0.676; plain RNN 0.679; Transformer 0.682 (PR-AUC 0.168). Paired bootstrap: Transformer − RNN +0.0034 (95% +0.0018..+0.0050), clearly better but small. Top-10% of Transformer scores come back 20.5% vs 8.6% average. Accuracy is 91.4% for every model = same as "always no", so never quote accuracy. Transformer: workshop attention/SelfAttention/Block, padding mask, FIRST-position (<cls>-style) summary, AdamW lr 0.001 (workshop used 0.003), 6 epochs, CPU. GRU tried (AUC 0.682, PR-AUC 0.172) and removed because the course does not teach it.
+- 20 Nov NEXT ROUND (Kristupas): bigger data 1 in 4 shoppers (Kaggle kernel v2, events_25pct.parquet); history start words from the previous 14 days (bought recently, number of visits, days since last visit); overnight tuning on validation only, same effort per model, 3 seeds for the best settings, test used once at the end.
+- docs/PROJECT_LOG.md = the full record (timeline, decisions with why, audit, models, results, tools, AI-use paragraph, 30-second scripts per role). Keep it updated after each round.
 - NEXT:
   1. Teammates accept the GitHub invites (sent 20 Nov, write access: ulapask, gusteruzgaite, jokubasspir-ops, bukauskaiteliepa-glitch).
   2. 02_baselines: random, industry rule, logistic regression on word counts; full data data/raw/visits_10pct.parquet, use the `split` column; pick cut-offs on valid only.

@@ -14,7 +14,7 @@ Built 20 Nov 2026 from the files in `course/`. Every claim cites a file and a sl
 | Index → vector | One-hot vector | W3 s21; W6 s29 | label y=1 → [0,1,0]; "an index is a name, not a quantity" | Word id 17 is not "more" than id 3. That is why we never feed raw ids. |
 | Index → learned vector | Embeddings | W8 s26, s34 ("What each token means (embeddings)"); WS c15 `nn.Embedding(vocab_size, d)` | tokens → embedding + position | Each click word gets a learned vector of length d. |
 | A visit is a sequence | Sequence, time step, "sequence → one" | W6 s20, s21 | x₁, …, x_T; "varying length, order matters"; example "sentiment of a review" | One visit (any length) → one yes/no. The same shape as review sentiment. |
-| Counts-only baseline | Logistic regression as a perceptron | W3 s16–s19; AK p19 (Vignette B) | z = Σ wᵢxᵢ, p = σ(z) = 1/(1+e^(−z)); ŷ = 1 if p ≥ 0.5 | Our LR on word counts (AUC 0.675). |
+| Counts-only baseline | Logistic regression as a perceptron | W3 s16–s19; AK p19 (Vignette B) | z = Σ wᵢxᵢ, p = σ(z) = 1/(1+e^(−z)); ŷ = 1 if p ≥ 0.5 | Our LR on word counts (AUC 0.676; scikit-learn cross-check 0.675). |
 | Why counts are not enough | Vignette E "Read Between the Lines" | RS p18; AK p21 | "LR on word counts … throws away order" → RNN | The lecturer's own argument for our ladder: counts → RNN → Transformer. |
 | Probability output | Sigmoid; softmax for q classes | W3 s16–s17, s20, s22; W8 s8 | σ(z); "Features → logits → softmax probabilities → decisions" | Our model ends in one logit → σ → chance to come back. |
 | Loss | Negative log-likelihood = cross-entropy | W3 s18; W8 s8 | L(w) = −Σᵢ [y⁽ⁱ⁾ log σ(z⁽ⁱ⁾) + (1−y⁽ⁱ⁾) log(1−σ(z⁽ⁱ⁾))]; "−log ŷ_true class" | This is our binary cross-entropy loss. |
