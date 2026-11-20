@@ -1,0 +1,17 @@
+# Data: never commit (small samples in data/sample/ are the exception)
+data/raw/
+*.csv
+*.parquet
+*.zip
+*.gz
+!data/sample/**
+
+# Python / tools
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+.omc/
+
+# Keep the trained model
+!app/model.pt
