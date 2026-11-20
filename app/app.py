@@ -1,157 +1,621 @@
-"""Nudge demo: a fake electronics shop.
+"""Nudge demo: "Mercato", a small online shop with ~100 funny products.
 
 Run from the repo root:  python -m streamlit run app/app.py
 
-A visitor views products, adds/removes them from the cart, then clicks "Leave the shop".
-The click sequence goes to predict() (nudge/contract.py), and the decision layer
-(nudge/decision.py) picks: no message / reminder / reminder + 10%.
+A visitor browses (each product page opened = a view click), adds to cart, and finally leaves.
+Their clicks become words (nudge/contract.py), predict() gives the chance they come back and buy
+on their own within 7 days, and the decision layer (nudge/decision.py) picks:
+no message / reminder only / reminder + 10%.
+
+Screenshot shortcuts (only read when a new visitor opens the page):
+  ?cart=p024,p023   start with these products in the cart
+  ?view=p024        start on that product page
+  ?page=left        start on the "shopper left" result page
 """
 
+import base64
+import html
+import io
 import sys
 import time
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT.parent))
 from nudge.contract import IS_PLACEHOLDER, predict, session_words  # noqa: E402
-from nudge.decision import (  # noqa: E402
-    DISCOUNT,
-    DISCOUNT_RATE,
-    LABELS,
-    NOTHING,
-    REMINDER,
-    cutoffs,
-    decide,
-    expected_wasted_discount,
+from nudge.decision import DISCOUNT, DISCOUNT_RATE, NOTHING, REMINDER, cutoffs, decide  # noqa: E402
+
+SHOP = "Mercato"
+PAGE_SIZE = 20
+
+st.set_page_config(page_title=f"{SHOP} · demo shop", page_icon=":material/shopping_bag:", layout="wide",
+                   initial_sidebar_state="collapsed")
+
+
+# --- Catalogue: 16 classmate products (shown first, with a friend's photo as an easter egg) + 90 funny products ---
+@st.cache_data
+def load_catalog() -> pd.DataFrame:
+    shop = pd.read_csv(ROOT / "shop" / "catalog.csv")
+    shop["image"] = shop["id"].map(lambda i: ROOT / "shop" / "images" / f"{i}.jpg")
+    custom = pd.read_csv(ROOT / "shop" / "custom" / "products.csv", dtype=str).fillna("")
+    custom = custom[custom["name"].str.strip() != ""].copy()
+    custom["price"] = pd.to_numeric(custom["price"], errors="coerce").fillna(0)
+    custom["image"] = custom["photo"].map(lambda f: ROOT / "shop" / "custom" / f)
+    if "friend_photo" not in custom:
+        custom["friend_photo"] = ""
+    custom["friend"] = custom["friend_photo"].map(lambda f: str(ROOT / "shop" / "custom" / f) if f and (ROOT / "shop" / "custom" / f).exists() else None)
+    custom["featured"] = True
+    shop["friend"], shop["featured"] = None, False
+    both = pd.concat([custom.drop(columns=["photo", "friend_photo"]), shop.drop(columns=["photo_query"])], ignore_index=True)
+    both = both[both["price"] > 0]
+    both["image"] = both["image"].map(lambda p: str(p) if Path(p).exists() else None)
+    return both.set_index("id", drop=False)
+
+
+@st.cache_data
+def thumb(path: str | None, size: int = 160) -> str:
+    """Small square JPEG as a data URI, for images inside HTML (cart rows, message preview)."""
+    if not path:
+        return ""
+    from PIL import Image
+
+    with Image.open(path) as im:
+        im = im.convert("RGB")
+        im.thumbnail((size, size))
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=82)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+CATALOG = load_catalog()
+
+# --- Look: Mercato's own shop style (not a copy of any real brand) ---------------------------------
+# White page, photos first, ink-black actions, one tomato accent. Plus Jakarta Sans when online,
+# the system UI font (SF Pro / Segoe UI) when offline.
+st.markdown(
+    """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+:root {
+  --ink:#14161A; --ink-2:#2E3238; --muted:#5D636C; --faint:#8A9099; --line:#E6E5E1; --line-2:#D6D4CE;
+  --paper:#FFFFFF; --soft:#F5F4F1; --soft-2:#EEEDE8; --accent:#C93A25; --accent-soft:#FBEDEA;
+  --ok:#1E6B4F; --ok-soft:#E7F2EC;
+  --sans:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.stApp, .stApp *:not([data-testid="stIconMaterial"]):not(.code) { font-family: var(--sans) !important; }
+.stApp .bz-bubble .code { font-family: var(--mono) !important; }
+
+[data-testid="stElementContainer"]:has(style) { display:none; }
+.stApp { background: var(--paper); color: var(--ink); }
+header[data-testid="stHeader"], footer, #MainMenu, [data-testid="stToolbar"], [data-testid="stDecoration"] { display:none !important; }
+.stMain { overflow-x: hidden; }
+.block-container { padding: 0 32px 64px 32px !important; max-width: 1360px; }
+@media (min-width: 1700px) { .block-container { max-width: 1600px; } }
+[data-testid="stImage"] button, [data-testid="stElementToolbar"] { display:none !important; }
+
+/* Keyboard focus: always visible, one style */
+button:focus-visible, input:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--ink) !important; outline-offset: 2px !important; box-shadow:none !important; }
+
+/* --- Buttons ------------------------------------------------------------------------------- */
+.stButton button { border-radius: 10px; min-height: 40px; font-weight: 600; font-size: 14px; letter-spacing: .005em;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .1s ease; }
+.stButton button:active { transform: translateY(1px); }
+button[data-testid="stBaseButton-primary"] { background: var(--ink); border: 1px solid var(--ink); color:#fff; }
+button[data-testid="stBaseButton-primary"]:hover { background: var(--ink-2); border-color: var(--ink-2); color:#fff; }
+button[data-testid="stBaseButton-secondary"] { background:#fff; border:1px solid var(--line-2); color: var(--ink); }
+button[data-testid="stBaseButton-secondary"]:hover { border-color: var(--ink); color: var(--ink); background:#fff; }
+button[data-testid="stBaseButton-primary"]:disabled, button[data-testid="stBaseButton-secondary"]:disabled {
+  background: var(--soft); border-color: var(--soft); color: var(--faint); opacity:1; cursor: default; }
+div[class*="st-key-gc_"] button:disabled, div[class*="st-key-sc_"] button:disabled, .st-key-detail_cart button:disabled {
+  background: var(--ok-soft); border-color: var(--ok-soft); color: var(--ok); }
+div[class*="st-key-gc_"] button, div[class*="st-key-sc_"] button { min-height: 36px; padding: 0 12px; background:#fff;
+  border: 1px solid var(--line-2); color: var(--ink); font-size: 14px; }
+div[class*="st-key-gc_"] button:not(:disabled):hover, div[class*="st-key-sc_"] button:not(:disabled):hover {
+  background: var(--ink); border-color: var(--ink); color:#fff; }
+button[data-testid="stBaseButton-tertiary"] { color: var(--muted); font-weight:500; min-height: 28px; padding: 0; }
+button[data-testid="stBaseButton-tertiary"]:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
+/* --- Header ------------------------------------------------------------------------------- */
+.bz-util { margin: 0 calc(50% - 50vw); padding: 8px calc(50vw - 50%); background: var(--ink); color:#D9DBDF;
+  font-size: 13px; display:flex; justify-content:space-between; gap:24px; letter-spacing:.01em; }
+.bz-util b { color:#fff; font-weight:600; }
+.bz-util .sep { color:#6B717A; margin: 0 10px; }
+.st-key-hdr { padding: 16px 0 0 0; gap: 8px; }
+.bz-logo { display:flex; align-items:center; gap:10px; text-decoration:none; height:48px; }
+.bz-logo .mark { width:30px; height:30px; border-radius:9px; background: var(--ink); position:relative; flex:none; }
+.bz-logo .mark span { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:17px; }
+.bz-logo .word { font-weight:800; font-size:26px; letter-spacing:-.04em; color: var(--ink); }
+.st-key-hdr [data-testid="stTextInput"] > div > div { border-radius: 999px; background: var(--soft); border: 1px solid var(--soft); min-height:48px; }
+.st-key-hdr [data-testid="stTextInput"] > div > div:focus-within { background:#fff; border-color: var(--ink); }
+.st-key-hdr [data-testid="stTextInput"] input { font-size: 15px; padding-left: 4px; color: var(--ink); }
+.st-key-hdr [data-testid="stTextInput"] input::placeholder { color: var(--muted); opacity:1; }
+.bz-hcart { display:flex; align-items:center; justify-content:flex-end; gap:12px; height:48px; color: var(--ink); }
+.bz-hcart .ico { position:relative; width:28px; height:28px; }
+.bz-hcart .badge { position:absolute; top:-6px; right:-9px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background: var(--ink);
+  color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px #fff; }
+/* Category navigation: text tabs with an underline */
+.st-key-nav { border-bottom: 1px solid var(--line); margin: 4px 0 8px 0; padding: 0; }
+.st-key-nav [role="radiogroup"] { gap: 0 32px; }
+.st-key-nav button[data-variant="pills"] { background: transparent !important; border: none !important; border-radius: 0 !important;
+  padding: 12px 0 14px 0 !important; min-height: 0; color: var(--muted) !important; box-shadow: inset 0 -2px 0 transparent; }
+.st-key-nav button[data-variant="pills"] p { font-size: 15px; font-weight: 600; }
+.st-key-nav button[data-variant="pills"]:hover { color: var(--ink) !important; box-shadow: inset 0 -2px 0 var(--line-2); }
+.st-key-nav button[data-variant="pills"][data-selected="true"] { color: var(--ink) !important; box-shadow: inset 0 -2px 0 var(--ink); }
+
+/* --- Listing ------------------------------------------------------------------------------ */
+.bz-listhead { display:flex; align-items:baseline; justify-content:space-between; margin: 8px 0 32px 0; }
+.bz-listhead .h { font-size: 28px; font-weight: 800; letter-spacing:-.025em; margin:0; padding:0; color: var(--ink); line-height:1.2; }
+.bz-listhead span { color: var(--muted); font-size: 15px; }
+.bz-section { font-size: 22px; font-weight: 800; letter-spacing:-.02em; color: var(--ink); margin: 48px 0 16px 0; }
+
+/* Product card: the photo is the hero; the whole card opens the product page */
+[class*="st-key-card_"] { position: relative; gap: 8px; padding-bottom: 24px; }
+[class*="st-key-card_"] [data-testid="stImage"] { border-radius: 12px; overflow:hidden; background: var(--soft); }
+[class*="st-key-card_"] [data-testid="stImage"] img { border-radius: 12px; aspect-ratio: 1/1; object-fit: cover; width:100%;
+  transition: transform .35s cubic-bezier(.2,.7,.2,1); }
+[class*="st-key-card_"]:hover [data-testid="stImage"] img { transform: scale(1.035); }
+[class*="st-key-card_"]:hover .bz-name { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+div[class*="st-key-gv_"], div[class*="st-key-sv_"] { position:absolute !important; top:0; left:0; right:0; bottom: 68px; z-index: 3; margin:0; }
+div[class*="st-key-gv_"] .stButton, div[class*="st-key-sv_"] .stButton,
+div[class*="st-key-gv_"] button, div[class*="st-key-sv_"] button { width:100% !important; height:100% !important; }
+div[class*="st-key-gv_"] button, div[class*="st-key-sv_"] button { background: transparent !important; border: none !important;
+  color: transparent !important; border-radius: 12px; cursor: pointer; }
+.bz-meta { padding: 4px 0 12px 0; }
+.bz-cat { color: var(--muted); font-size: 11.5px; font-weight:600; text-transform: uppercase; letter-spacing: .08em; }
+.bz-name { font-weight: 600; color: var(--ink); line-height: 1.35; font-size: 15px; margin: 4px 0 8px 0; height: 2.7em;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient: vertical; overflow:hidden; }
+.bz-price { font-weight: 800; font-size: 18px; color: var(--ink); letter-spacing:-.01em; font-variant-numeric: tabular-nums; }
+.bz-noimg { aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; background: var(--soft); color: var(--muted);
+  border-radius:12px; font-size:13px; }
+.bz-empty { padding: 64px 0; text-align:center; color: var(--muted); }
+.bz-empty b { display:block; color: var(--ink); font-size: 18px; margin-bottom: 4px; }
+
+/* --- Product page ------------------------------------------------------------------------- */
+.bz-crumb { color: var(--muted); font-size: 13px; }
+.bz-crumb b { color: var(--ink); font-weight:600; }
+.st-key-pdp_img [data-testid="stImage"] { background: var(--soft); border-radius: 16px; overflow:hidden; }
+.st-key-pdp_img [data-testid="stImage"] img { border-radius: 16px; aspect-ratio:1/1; object-fit:cover; }
+.bz-pdp-cat { color: var(--muted); font-size: 12px; font-weight:700; text-transform: uppercase; letter-spacing:.1em; margin-top: 8px; }
+.bz-pdp-name { font-size: 34px; line-height: 1.15; font-weight: 800; letter-spacing: -.03em; color: var(--ink); margin: 8px 0 16px 0; }
+.bz-big-price { font-size: 30px; font-weight: 800; color: var(--ink); letter-spacing:-.02em; font-variant-numeric: tabular-nums; }
+.bz-vat { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.bz-desc { color: var(--ink-2); font-size: 17px; line-height: 1.6; margin: 24px 0 24px 0; max-width: 34em; }
+.st-key-detail_cart button { min-height: 52px; font-size: 16px; padding: 0 40px; min-width: 260px; }
+.bz-perks { list-style:none; padding:0; margin: 16px 0 0 0; border-top: 1px solid var(--line); }
+.bz-perks li { display:flex; gap:12px; align-items:center; padding: 12px 0; border-bottom: 1px solid var(--line); color: var(--ink-2); font-size: 14px; margin:0; }
+.bz-perks svg { flex:none; color: var(--ink); }
+
+/* --- Side column: cart + what Nudge sees -------------------------------------------------- */
+div[data-testid="stColumn"]:has(.st-key-cartbox) { position: sticky; top: 16px; align-self: flex-start; min-width: 300px; }
+.st-key-cartbox { border: 1px solid var(--line); border-radius: 16px; padding: 20px; gap: 12px; background:#fff; }
+.bz-panel-title { font-weight: 800; color: var(--ink); font-size: 17px; letter-spacing:-.01em; display:flex; justify-content:space-between; align-items:baseline; }
+.bz-panel-title span { color: var(--muted); font-size: 13px; font-weight: 500; }
+.bz-citem { display:flex; gap:12px; align-items:center; padding: 4px 0; }
+div[class*="st-key-rm_"] button { min-height: 32px; width: 32px; padding: 0; border-radius: 8px; justify-content:center; }
+div[class*="st-key-rm_"] button:hover { background: var(--soft); text-decoration: none; }
+div[class*="st-key-rm_"] button p { position:absolute; width:1px; height:1px; overflow:hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
+.bz-citem img { width:48px; height:48px; border-radius:8px; object-fit:cover; background: var(--soft); flex:none; }
+.bz-citem .t { font-size: 13.5px; line-height:1.3; color: var(--ink); font-weight:500;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient: vertical; overflow:hidden; }
+.bz-citem .p { font-size: 13.5px; font-weight: 700; margin-top: 2px; }
+.bz-cempty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+.bz-total { display:flex; justify-content:space-between; align-items:baseline; border-top: 1px solid var(--line); padding-top: 12px; margin: 4px 0 8px 0; }
+.bz-total span { color: var(--muted); font-size: 14px; }
+.bz-total b { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.st-key-nudgebox { background: var(--soft); border-radius: 16px; padding: 20px 20px 16px 20px; gap: 8px; margin-top: 8px; }
+.bz-nudge-title { display:flex; align-items:center; gap:8px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing:.1em; color: var(--muted); }
+.bz-nudge-title i { width:8px; height:8px; border-radius:50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(30,107,79,.15); }
+.bz-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.st-key-nudgebox .bz-chips { flex-direction: column; align-items: flex-start; gap: 6px; margin: 4px 0; }
+.bz-chip { display:inline-block; font-size: 15px; font-weight: 500; line-height: 1.3; padding: 6px 10px; border-radius: 8px;
+  background:#fff; border:1px solid var(--line); color: var(--ink); }
+.bz-chip.cart { border-color: #BFDCCB; background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+.bz-chip.start { background: var(--ink); color:#fff; border-color: var(--ink); }
+.bz-more { color: var(--muted); font-size: 13px; }
+.bz-nudge-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 8px 0; }
+
+/* --- Result page ("the shopper left") ----------------------------------------------------- */
+.bz-eyebrow { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing:.12em; color: var(--muted); margin-top: 16px; }
+.bz-left-title { font-size: 34px; font-weight: 800; letter-spacing: -.03em; color: var(--ink); margin: 6px 0 0 0; line-height:1.15; }
+.bz-result { display:grid; grid-template-columns: 7fr 5fr; gap: 32px; align-items: stretch; }
+.bz-card { border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px; }
+.bz-hero-label { color: var(--muted); font-size: 16px; line-height:1.5; }
+.bz-hero-label b { color: var(--ink); }
+.bz-hero { font-size: 104px; font-weight: 800; color: var(--ink); line-height: .95; letter-spacing: -.06em; font-variant-numeric: tabular-nums;
+  margin: 4px 0 8px -4px; }
+.bz-hero sup { font-size: .42em; vertical-align: top; position: relative; top: .18em; margin-left: 4px; letter-spacing:0; color: var(--muted); }
+.bz-scale { position:relative; height: 12px; display:flex; gap: 2px; margin-top: 32px; }
+.bz-scale .z { height:100%; opacity: .3; }
+.bz-scale .z.on { opacity: 1; }
+.bz-scale .z0 { background: #8A9099; border-radius: 6px 0 0 6px; }
+.bz-scale .z1 { background: var(--accent); }
+.bz-scale .z2 { background: var(--ink-2); border-radius: 0 6px 6px 0; }
+.bz-scale .pin { position:absolute; top:-6px; width: 4px; height: 24px; background: var(--ink); border-radius: 2px; transform: translateX(-2px);
+  box-shadow: 0 0 0 2px #fff; }
+.bz-scale .pin span { position:absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--ink); color:#fff;
+  font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+.bz-legend { display:flex; gap: 8px 24px; flex-wrap: wrap; margin-top: 14px; font-size: 15px; color: var(--muted); }
+.bz-legend span { display:inline-flex; align-items:center; gap:8px; }
+.bz-legend i { width:12px; height:12px; border-radius:3px; display:inline-block; opacity: .3; }
+.bz-legend .on { color: var(--ink); font-weight: 700; }
+.bz-legend .on i { opacity: 1; }
+.bz-decision { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.bz-decision small, .bz-seen small { display:block; font-size: 13px; font-weight:700; text-transform: uppercase; letter-spacing:.1em; color: var(--muted); margin-bottom: 6px; }
+.bz-decision .d { font-size: 28px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); line-height:1.25; }
+.bz-decision .why { color: var(--muted); font-size: 16px; margin-top: 4px; }
+.bz-money { margin-top: 14px; display:inline-flex; gap:8px; align-items:center; padding: 8px 12px; border-radius: 8px; font-size: 15px; font-weight:600; }
+.bz-money.keep { background: var(--ok-soft); color: var(--ok); }
+.bz-money.give { background: var(--accent-soft); color: #9C2C1B; }
+.bz-seen { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.bz-seen .bz-chip { font-size: 13px; padding: 4px 8px; color: var(--muted); }
+.bz-seen .bz-chip.start { color:#fff; }
+.bz-seen .bz-chip.cart { color: var(--ok); }
+/* Message preview: a generic chat app on a phone (not a copy of any real app's branding) */
+.bz-phonecol { display:flex; flex-direction:column; gap: 12px; }
+.bz-phone { flex: 1; border-radius: 28px; border: 1px solid var(--line-2); background: #fff; overflow:hidden; display:flex; flex-direction:column;
+  box-shadow: 0 1px 2px rgba(20,22,26,.04), 0 24px 48px -24px rgba(20,22,26,.18); }
+.bz-phone-top { display:flex; align-items:center; gap:12px; padding: 14px 20px; border-bottom: 1px solid var(--line); background:#fff; }
+.bz-ava { width:36px; height:36px; border-radius:50%; background: var(--ink); color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:16px; }
+.bz-phone-top b { font-size: 15px; display:block; color: var(--ink); }
+.bz-phone-top small { font-size: 13px; color: var(--muted); }
+.bz-chat { flex: 1; background: #ECE7DF; padding: 20px 16px 24px 16px; display:flex; flex-direction:column; gap:8px; }
+.bz-day { align-self:center; background: rgba(255,255,255,.75); color: var(--muted); font-size: 12px; padding: 4px 10px; border-radius: 8px; margin-bottom: 4px; }
+.bz-bubble { background:#fff; color:#111; padding: 8px 8px 6px 8px; border-radius: 4px 14px 14px 14px; max-width: 88%; font-size: 15px; line-height: 1.45;
+  box-shadow: 0 1px 1px rgba(0,0,0,.08); }
+.bz-bubble img { width: 100%; aspect-ratio: 4/3; object-fit: cover; object-position: center; border-radius: 10px; display:block; margin-bottom: 8px; }
+.bz-bubble p { margin: 0 4px; }
+.bz-bubble .code { font-family: var(--mono); background: var(--accent-soft); color:#9C2C1B; padding: 1px 6px; border-radius: 4px; font-weight: 700; }
+.bz-bubble small { display:block; text-align:right; color:#6B7178; font-size:12px; margin: 4px 4px 0 0; }
+.bz-bubble.ghost { background: transparent; box-shadow:none; border: 1.5px dashed #B4AEA4; color: #8F887D; padding: 10px 12px; }
+.bz-bubble.ghost p { text-decoration: line-through; text-decoration-color: #A39C91; }
+.bz-quiet { margin: auto 0; display:flex; flex-direction:column; gap: 16px; align-items:center; }
+.bz-silent { text-align:center; color: var(--muted); font-size: 15px; line-height:1.5; }
+.bz-silent b { display:block; color: var(--ink); font-size: 17px; margin-bottom: 2px; }
+.bz-cap { text-align:center; color: var(--muted); font-size: 13px; }
+.st-key-lefthead { margin-bottom: 8px; }
+.bz-bubble.msg { max-width: 330px; }
+
+/* --- Thank-you page ----------------------------------------------------------------------- */
+.bz-thanks { max-width: 560px; margin: 64px auto 24px auto; text-align:center; }
+.bz-thanks .tick { width:56px; height:56px; border-radius:50%; background: var(--ok-soft); color: var(--ok); display:flex; align-items:center; justify-content:center; margin: 0 auto 24px auto; }
+.bz-thanks h1 { font-size: 34px; font-weight: 800; letter-spacing: -.03em; margin: 0 0 8px 0; padding:0; }
+.bz-thanks p { color: var(--muted); font-size: 16px; line-height: 1.6; }
+
+/* Narrow laptops: keep everything inside the screen */
+@media (max-width: 1360px) {
+  .block-container { padding: 0 24px 48px 24px !important; }
+  .bz-name { font-size: 14px; }
+  .bz-hero { font-size: 96px; }
+  .bz-card { padding: 24px 28px; }
+}
+.bz-wild { margin-top: 24px; border-top: 1px solid var(--line, #e7e5e1); padding-top: 16px; }
+.bz-wild-title { font-weight: 600; font-size: 15px; margin-bottom: 10px; }
+.bz-wild img { width: 100%; max-height: 420px; object-fit: cover; border-radius: 12px; display: block; }
+.bz-wild-cap { font-size: 13px; color: #6b6b6b; margin-top: 6px; }
+</style>
+""",
+    unsafe_allow_html=True,
 )
 
-# ~6 products from categories that exist in the training data (multi-category store, electronics).
-PRODUCTS = [
-    {"id": "phone", "name": "Smartphone", "icon": "📱", "price": 299},
-    {"id": "laptop", "name": "Laptop", "icon": "💻", "price": 749},
-    {"id": "headphones", "name": "Headphones", "icon": "🎧", "price": 89},
-    {"id": "watch", "name": "Smartwatch", "icon": "⌚", "price": 179},
-    {"id": "tablet", "name": "Tablet", "icon": "📟", "price": 349},
-    {"id": "speaker", "name": "Speaker", "icon": "🔊", "price": 59},
-]
-BY_ID = {p["id"]: p for p in PRODUCTS}
+ICON = {  # one line-icon style (24px grid, 1.75 stroke), inline so it works offline
+    "bag": '<path d="M6 7h12l1 13H5L6 7Z"/><path d="M9 7V6a3 3 0 0 1 6 0v1"/>',
+    "truck": '<path d="M3 6h11v10H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.5"/><circle cx="17" cy="17.5" r="1.5"/>',
+    "return": '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+    "check": '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    "clock": '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+}
 
-st.set_page_config(page_title="Nudge demo shop", page_icon="🛒", layout="wide")
 
-# --- Session state: the click log (event, product) and the cart -------------------------
+def icon(name: str, size: int = 20) -> str:
+    return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" '
+            f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{ICON[name]}</svg>')
+
+
+def esc(text) -> str:
+    return html.escape(str(text))
+
+
+def euro(x: float) -> str:
+    return f"€{x:,.0f}"
+
+
+WORD_PARTS = {"view": "viewed", "cart": "added to cart", "start": "first click", "quick": "quick",
+              "normal": "normal pace", "long": "long pause", "away": "came back later",
+              "new": "new visitor", "returning": "returning visitor"}
+
+
+def word_label(word: str) -> str:
+    """Model word -> plain words for the audience: "view_expensive_again_quick" -> "viewed · expensive · again · quick"."""
+    return " · ".join(WORD_PARTS.get(part, part) for part in word.split("_"))
+
+
+def chips(words: list[str], last: int | None = None) -> str:
+    """Words as chips (raw model word in the tooltip). With `last`, only the latest ones plus a count of earlier ones."""
+    shown = list(enumerate(words))
+    more = ""
+    if last and len(shown) > last:
+        more = f'<span class="bz-more">+ {len(shown) - last} earlier</span>'
+        shown = shown[-last:]
+    return more + "".join(
+        f'<span class="bz-chip{" cart" if w.startswith("cart") else ""}{" start" if i == 0 else ""}" title="{esc(w)}">'
+        f'{esc(word_label(w))}</span>' for i, w in shown)
+
+
+# --- State -----------------------------------------------------------------------------------------
 if "clicks" not in st.session_state:
-    st.session_state.clicks = []  # list of {event, product_id, price, time}
-    st.session_state.cart = []  # product ids in cart
-    st.session_state.left = False
-
-
-def click(event: str, pid: str) -> None:
-    # Remove is a demo convenience only: the training data has no remove clicks, so it is not sent to the model.
-    if event == "remove":
-        st.session_state.cart.remove(pid)
-    else:
-        now = time.time()
-        if event == "cart" and all(c["product_id"] != pid for c in st.session_state.clicks):
-            # Real shoppers almost always open a product before adding it (99.6% in the data), so the
-            # model has barely seen a cart without a view. Record the product view first.
-            st.session_state.clicks.append({"event": "view", "product_id": pid, "price": BY_ID[pid]["price"], "time": now})
-            now += 1
-        st.session_state.clicks.append({"event": event, "product_id": pid, "price": BY_ID[pid]["price"], "time": now})
-        if event == "cart":
-            st.session_state.cart.append(pid)
-    st.session_state.left = False
-
-
-def reset() -> None:
-    st.session_state.clicks = []
-    st.session_state.cart = []
-    st.session_state.left = False
-
-
-# --- Sidebar: the shop owner's one setting -----------------------------------------------
-with st.sidebar:
-    st.header("Shop owner settings")
-    generosity = st.slider("How generous are you with discounts?", 0, 100, 50, step=5) / 100
-    low, high = cutoffs(generosity)
-    st.caption(
-        f"Below **{low:.0%}**: no message  \n"
-        f"{low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%}  \n"
-        f"Above **{high:.0%}**: reminder only"
-    )
-    returning = st.toggle("Customer has visited before", value=False)
-    st.button("New visitor (reset)", on_click=reset, use_container_width=True)
-
-st.title("🛒 Nudge demo shop")
-if IS_PLACEHOLDER:
-    st.warning("Placeholder model: predictions come from a hand-written rule, not the trained Transformer yet.")
-
-# --- Product grid ----------------------------------------------------------------------
-cols = st.columns(3)
-for i, p in enumerate(PRODUCTS):
-    with cols[i % 3]:
-        with st.container(border=True):
-            st.subheader(f"{p['icon']} {p['name']}")
-            st.write(f"€{p['price']}")
-            a, b = st.columns(2)
-            a.button("View", key=f"view_{p['id']}", on_click=click, args=("view", p["id"]),
-                     use_container_width=True)
-            if p["id"] in st.session_state.cart:
-                b.button("Remove", key=f"rm_{p['id']}", on_click=click, args=("remove", p["id"]),
-                         use_container_width=True)
-            else:
-                b.button("Add to cart", key=f"cart_{p['id']}", on_click=click, args=("cart", p["id"]),
-                         use_container_width=True, type="primary")
-
-# --- Live click sequence ---------------------------------------------------------------
-st.subheader("Your clicks so far")
-session = session_words(st.session_state.clicks, returning)
-if st.session_state.clicks:
-    st.write(f"`{session[0]}` → " + " → ".join(
-        f"{BY_ID[c['product_id']]['icon']} `{w}`" for c, w in zip(st.session_state.clicks, session[1:])))
-    st.caption("Each click becomes one word: type, price band, 'again' if seen before, time since previous click.")
+    st.session_state.update(clicks=[], cart=[], page="shop", product=None, limit=PAGE_SIZE, left=False)
+    _start = True
 else:
-    st.caption("No clicks yet.")
-cart_value = sum(BY_ID[pid]["price"] for pid in st.session_state.cart)
-st.write(f"Cart: {len(st.session_state.cart)} item(s), €{cart_value}")
+    _start = False
 
-if st.button("🚪 Leave the shop", type="primary"):
-    st.session_state.left = True
 
-# --- What Nudge decides ------------------------------------------------------------------
-if st.session_state.left:
-    p = predict(session)
+def log(event: str, pid: str) -> None:
+    """Record a click the model understands (view or cart). A cart without a view first also records the
+    view, because real shoppers almost always open a product before adding it (99.6% in the data)."""
+    now = time.time()
+    price = float(CATALOG.loc[pid, "price"])
+    if event == "cart" and all(c["product_id"] != pid for c in st.session_state.clicks):
+        st.session_state.clicks.append({"event": "view", "product_id": pid, "price": price, "time": now})
+        now += 1
+    st.session_state.clicks.append({"event": event, "product_id": pid, "price": price, "time": now})
+
+
+def open_product(pid: str) -> None:
+    log("view", pid)
+    st.session_state.update(page="product", product=pid)
+
+
+def add_to_cart(pid: str) -> None:
+    log("cart", pid)
+    st.session_state.cart.append(pid)
+
+
+def remove_from_cart(pid: str) -> None:
+    # Not sent to the model: the training data has no remove clicks.
+    st.session_state.cart.remove(pid)
+
+
+def go_shop() -> None:
+    st.session_state.update(page="shop", product=None)
+
+
+def leave() -> None:
+    st.session_state.update(page="left", left=True)
+
+
+def checkout() -> None:
+    st.session_state.update(page="bought")
+
+
+def new_visitor() -> None:
+    st.session_state.update(clicks=[], cart=[], page="shop", product=None, limit=PAGE_SIZE, left=False)
+
+
+if _start:  # screenshot shortcuts (see the module docstring); a normal visit has no query parameters
+    qp = st.query_params
+    for pid in [p for p in qp.get("cart", "").split(",") if p in CATALOG.index]:
+        add_to_cart(pid)
+    if qp.get("view") in CATALOG.index:
+        open_product(qp["view"])
+    if qp.get("page") == "left":
+        leave()
+
+# --- Presenter controls (sidebar, hidden until opened) ------------------------------------------------
+with st.sidebar:
+    st.markdown("### Presenter controls")
+    generosity = st.slider("Shop owner: how generous with discounts?", 0, 100, 50, step=5) / 100
+    low, high = cutoffs(generosity)
+    st.caption(f"Under {low:.0%}: no message · {low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%} · over {high:.0%}: reminder only")
+    returning = st.toggle("This customer has visited in the last 14 days", value=False)
+    show_words = st.toggle("Show what Nudge sees", value=True)
+    st.button("New visitor", on_click=new_visitor, use_container_width=True)
+    if IS_PLACEHOLDER:
+        st.warning("Placeholder model: a hand-written rule, not the trained Transformer yet.")
+
+
+def product_image(row) -> None:
+    if row["image"]:
+        st.image(row["image"], width="stretch")
+    else:
+        st.markdown('<div class="bz-noimg">Photo coming soon</div>', unsafe_allow_html=True)
+
+
+def product_card(row, key_prefix: str) -> None:
+    """Photo, category, name (2 lines max), price, Add to cart. The invisible "View" button covers the
+    photo and text, so clicking anywhere on the card opens the product page (like any big shop)."""
+    pid = row["id"]
+    with st.container(key=f"card_{key_prefix}_{pid}", gap=None):
+        st.button(f"View {row['name']}", key=f"{key_prefix}v_{pid}", on_click=open_product, args=(pid,))
+        product_image(row)
+        st.markdown(f'<div class="bz-meta"><div class="bz-cat">{esc(row["category"])}</div>'
+                    f'<div class="bz-name" title="{esc(row["name"])}">{esc(row["name"])}</div>'
+                    f'<div class="bz-price">{euro(row["price"])}</div></div>', unsafe_allow_html=True)
+        in_cart = pid in st.session_state.cart
+        st.button("In your cart" if in_cart else "Add to cart", key=f"{key_prefix}c_{pid}", on_click=add_to_cart,
+                  args=(pid,), width="stretch", type="secondary", disabled=in_cart,
+                  icon=":material/check:" if in_cart else None)
+
+
+def product_grid(rows: pd.DataFrame, key_prefix: str, per_row: int = 4) -> None:
+    for start in range(0, len(rows), per_row):
+        cols = st.columns(per_row, gap="medium")
+        for col, (_, row) in zip(cols, rows.iloc[start:start + per_row].iterrows()):
+            with col:
+                product_card(row, key_prefix)
+
+
+cart_value = float(sum(CATALOG.loc[p, "price"] for p in st.session_state.cart))
+page = st.session_state.page
+
+# --- Header ------------------------------------------------------------------------------------------
+st.markdown(f'<div class="bz-util"><div><b>Free delivery</b> over €50<span class="sep">|</span>30-day returns'
+            f'<span class="sep">|</span>Ships in 1–2 days</div><div><b>Demo shop for the Nudge project</b></div></div>',
+            unsafe_allow_html=True)
+with st.container(key="hdr"):
+    h1, h2, h3 = st.columns([1.15, 3, 1.15], vertical_alignment="center", gap="large")
+    h1.markdown(f'<div class="bz-logo" aria-label="{SHOP}"><div class="mark"><span>m</span></div>'
+                f'<div class="word">{SHOP.lower()}</div></div>', unsafe_allow_html=True)
+    query = h2.text_input("Search", placeholder=f"Search {len(CATALOG)} products", label_visibility="collapsed",
+                          key="q", icon=":material/search:", on_change=go_shop)
+    n = len(st.session_state.cart) if page in ("shop", "product") else 0  # cleared once the visit is over
+    badge = f'<span class="badge">{n}</span>' if n else ""
+    h3.markdown(f'<div class="bz-hcart" title="Cart: {n} item{"" if n == 1 else "s"}"><div class="ico">{icon("bag", 28)}{badge}</div></div>',
+                unsafe_allow_html=True)
+    cats = ["All"] + sorted(CATALOG["category"].unique().tolist())
+    if page != "shop":  # underline the product's category on a product page, nothing elsewhere
+        k = cats.index(CATALOG.loc[st.session_state.product, "category"]) + 1 if page == "product" else 0
+        st.markdown('<style>.st-key-nav button[data-variant="pills"][data-selected="true"] { box-shadow: none !important; color: var(--muted) !important; }'
+                    + (f'.st-key-nav [role="radiogroup"] > button:nth-of-type({k}) {{ box-shadow: inset 0 -2px 0 var(--ink) !important; color: var(--ink) !important; }}' if k else "")
+                    + '</style>', unsafe_allow_html=True)
+    with st.container(key="nav"):
+        cat = st.pills("Category", cats, default="All", label_visibility="collapsed", key="cat", on_change=go_shop) or "All"
+
+# --- Result page: full width, the number is the hero ---------------------------------------------------
+if page == "left":
+    words = session_words(st.session_state.clicks, returning)
+    p = predict(words)
     action = decide(p, generosity)
-    st.divider()
-    left_col, right_col = st.columns([1, 1])
+    with st.container(key="lefthead"):
+        t1, t2 = st.columns([7, 1.6], vertical_alignment="bottom", gap="medium")
+        t1.markdown('<div class="bz-eyebrow">The shopper left without buying</div>'
+                    '<div class="bz-left-title">What does Nudge do now?</div>', unsafe_allow_html=True)
+        t2.button("New visitor", on_click=new_visitor, key="left_new", width="stretch", icon=":material/refresh:")
+    on = {NOTHING: 0, DISCOUNT: 1, REMINDER: 2}[action]
+    zones = [(f"Under {low:.0%}: no message", low), (f"{low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%}", high - low),
+             (f"Over {high:.0%}: reminder only", 1 - high)]
+    bar = "".join(f'<div class="z z{i}{" on" if i == on else ""}" style="width:{w * 100:.1f}%"></div>' for i, (_, w) in enumerate(zones))
+    legend = "".join(f'<span class="{"on" if i == on else ""}"><i class="z{i}" style="background:{c}"></i>{t}</span>'
+                     for i, ((t, _), c) in enumerate(zip(zones, ["#8A9099", "#C93A25", "#2E3238"])))
+    verdict, why = {
+        NOTHING: ("No message", "Looks like just browsing. A message would only annoy them."),
+        REMINDER: ("Reminder only, no discount", "They will probably buy anyway, so the 10% stays in the shop."),
+        DISCOUNT: (f"Reminder + {DISCOUNT_RATE:.0%} discount", "They are on the fence. This is where a nudge pays off."),
+    }[action]
+    money = ""
+    if action == REMINDER and cart_value:
+        money = f'<div class="bz-money keep">Margin kept: {euro(DISCOUNT_RATE * cart_value)} a "discount everyone" flow would give away</div>'
+    if action == DISCOUNT and cart_value:
+        money = f'<div class="bz-money give">Discount offered: {euro(DISCOUNT_RATE * cart_value)} on a {euro(cart_value)} cart</div>'
+    first = CATALOG.loc[st.session_state.cart[0]] if st.session_state.cart else None
+    if first is not None:
+        text = f"Hi! You left your <b>{esc(first['name'])}</b> at {SHOP}. It's still waiting for you 🙂"
+    else:
+        text = f"Hi! Thanks for visiting {SHOP}. The things you looked at are still waiting for you 🙂"
+    if action == NOTHING:
+        chat = (f'<div class="bz-quiet"><div class="bz-bubble ghost"><p>{text}</p></div>'
+                f'<div class="bz-silent"><b>No message sent</b>Nudge stays quiet for this shopper.</div></div>')
+    else:
+        if action == DISCOUNT:
+            text += f' Here\'s {DISCOUNT_RATE:.0%} off if you order today: <span class="code">NUDGE10</span>'
+        img = thumb(first["image"], 480) if first is not None else ""
+        pic = f'<img src="{img}" alt="">' if img else ""
+        chat = f'<div class="bz-day">Today</div><div class="bz-bubble msg">{pic}<p>{text}</p><small>{time.strftime("%H:%M")}</small></div>'
+    pin = min(max(p, 0.01), 0.99) * 100
+    st.markdown(
+        f'<div class="bz-result"><div class="bz-card">'
+        f'<div class="bz-hero-label">Chance they come back and buy within 7 days <b>without any message</b></div>'
+        f'<div class="bz-hero">{p * 100:.0f}<sup>%</sup></div>'
+        f'<div class="bz-scale" role="img" aria-label="{p:.0%} on a scale from 0 to 100%">{bar}'
+        f'<div class="pin" style="left:{pin:.1f}%"><span>{p:.0%}</span></div></div>'
+        f'<div class="bz-legend">{legend}</div>'
+        f'<div class="bz-decision"><small>Decision</small><div class="d">{verdict}</div><div class="why">{why}</div>{money}</div>'
+        f'<div class="bz-seen"><small>What Nudge saw</small><div class="bz-chips">{chips(words)}</div></div>'
+        f'</div><div class="bz-phonecol"><div class="bz-phone"><div class="bz-phone-top"><div class="bz-ava">m</div><div><b>{SHOP}</b>'
+        f'<small>Message preview · WhatsApp-style</small></div></div><div class="bz-chat">{chat}</div></div>'
+        f'</div></div>', unsafe_allow_html=True)
+    st.stop()
 
-    with left_col:
-        st.subheader("What Nudge decides")
-        st.metric("Chance they come back and buy within 7 days, without a message", f"{p:.0%}")
-        st.write(f"**Decision:** {LABELS[action]}")
-        if action == DISCOUNT and cart_value:
-            waste = expected_wasted_discount(p, cart_value)
-            st.caption(f"Discount €{DISCOUNT_RATE * cart_value:.2f}; expected wasted on would-buy-anyway: "
-                       f"{p:.0%} × €{DISCOUNT_RATE * cart_value:.2f} = €{waste:.2f}")
-        elif action == REMINDER and cart_value:
-            st.caption(f"Saved €{DISCOUNT_RATE * cart_value:.2f} of margin: this shopper likely buys anyway.")
+main, side = st.columns([2.8, 1], gap="large")
 
-    with right_col:
-        st.subheader("Message preview")
-        first_item = BY_ID[st.session_state.cart[0]]["name"] if st.session_state.cart else None
-        if action == NOTHING:
-            st.info("No message sent: looks like just browsing.")
-        else:
-            thing = f"your {first_item}" if first_item else "the items you looked at"
-            text = f"Hi! You left {thing} in our shop. It's still waiting for you 🙂"
-            if action == DISCOUNT:
-                text += f" Here's {DISCOUNT_RATE:.0%} off if you order today: <b>NUDGE10</b>"
-            st.markdown(
-                f"""<div style="background:#e5ddd5;padding:16px;border-radius:12px;">
-                <div style="background:#dcf8c6;color:#111;padding:10px 14px;border-radius:8px;
-                max-width:90%;margin-left:auto;font-size:15px;">{text}
-                <div style="text-align:right;font-size:11px;color:#667;">now ✓✓</div></div></div>""",
-                unsafe_allow_html=True,
-            )
+# --- Cart + what Nudge sees (right column) -----------------------------------------------------------
+with side:
+    # line the cart card up with the first row of photos (measured: below the page title / the back link)
+    st.markdown(f'<style>.st-key-cartbox {{ margin-top: {74 if page == "shop" else 44}px; }}</style>', unsafe_allow_html=True)
+    with st.container(key="cartbox"):
+        n = len(st.session_state.cart)
+        st.markdown(f'<div class="bz-panel-title">Your cart <span>{n} item{"" if n == 1 else "s"}</span></div>',
+                    unsafe_allow_html=True)
+        for pid in st.session_state.cart:
+            r = CATALOG.loc[pid]
+            c1, c2 = st.columns([5, 1], vertical_alignment="center", gap="small")
+            img = thumb(r["image"])
+            c1.markdown(f'<div class="bz-citem">{f"<img src={chr(34)}{img}{chr(34)} alt={chr(34)}{chr(34)}>" if img else ""}'
+                        f'<div><div class="t">{esc(r["name"])}</div><div class="p">{euro(r["price"])}</div></div></div>',
+                        unsafe_allow_html=True)
+            c2.button("Remove", key=f"rm_{pid}", on_click=remove_from_cart, args=(pid,), type="tertiary",
+                      icon=":material/close:", help=f"Remove {r['name']} from the cart")
+        if not st.session_state.cart:
+            st.markdown('<div class="bz-cempty">Your cart is empty. Find something you didn\'t know you needed.</div>',
+                        unsafe_allow_html=True)
+        st.markdown(f'<div class="bz-total"><span>Total</span><b>{euro(cart_value)}</b></div>', unsafe_allow_html=True)
+        st.button("Checkout", on_click=checkout, width="stretch", type="primary", disabled=not st.session_state.cart)
+        st.button("Leave the shop", on_click=leave, width="stretch")
+    if show_words:
+        with st.container(key="nudgebox"):
+            words = session_words(st.session_state.clicks, returning)
+            st.markdown(f'<div class="bz-nudge-title"><i></i>What Nudge sees</div><div class="bz-chips">{chips(words, last=7)}</div>'
+                        f'<div class="bz-nudge-note">Every click becomes one word: what you did · price · seen before? · time since the last click.</div>',
+                        unsafe_allow_html=True)
 
-# Not built yet (see CLAUDE.md "Demo"): profit vs "discount everyone" chart, attention heatmap.
+# --- Pages -------------------------------------------------------------------------------------------
+with main:
+    if page == "shop":
+        shown = CATALOG
+        if cat != "All":
+            shown = shown[shown["category"] == cat]
+        elif not query:  # classmates' products first, then the rest with categories mixed (first rows not all Kitchen)
+            rest = shown[~shown["featured"]]
+            rest = rest.assign(_r=rest.groupby("category").cumcount()).sort_values(["_r", "category"], kind="stable").drop(columns="_r")
+            shown = pd.concat([shown[shown["featured"]], rest])
+        if query:
+            shown = shown[shown["name"].str.contains(query, case=False, regex=False)
+                          | shown["description"].str.contains(query, case=False, regex=False)]
+        title = f'Results for "{esc(query)}"' if query else ("All products" if cat == "All" else esc(cat))
+        st.markdown(f'<div class="bz-listhead"><div class="h">{title}</div><span>{len(shown)} product{"" if len(shown) == 1 else "s"}</span></div>',
+                    unsafe_allow_html=True)
+        if shown.empty:
+            st.markdown('<div class="bz-empty"><b>Nothing found</b>Try another word, or pick a category above.</div>',
+                        unsafe_allow_html=True)
+        product_grid(shown.head(st.session_state.limit), "g")
+        if len(shown) > st.session_state.limit:
+            _, mid, _ = st.columns([1, 1, 1])
+            mid.button(f"Show more ({len(shown) - st.session_state.limit} left)", width="stretch",
+                       on_click=lambda: st.session_state.update(limit=st.session_state.limit + PAGE_SIZE))
+
+    elif page == "product":
+        row = CATALOG.loc[st.session_state.product]
+        st.button("Back to all products", on_click=go_shop, type="tertiary", icon=":material/arrow_back:")
+        left_col, right_col = st.columns([1, 1], gap="large")
+        with left_col, st.container(key="pdp_img"):
+            product_image(row)
+            if row["friend"]:   # easter egg: a real photo of the product "in the wild"
+                st.markdown(f'<div class="bz-wild"><div class="bz-wild-title">Customer photos</div>'
+                            f'<img src="{thumb(row["friend"], 900)}" alt="A customer with this product">'
+                            f'<div class="bz-wild-cap">Spotted in the wild</div></div>', unsafe_allow_html=True)
+        with right_col:
+            st.markdown(f'<div class="bz-pdp-cat">{esc(row["category"])}</div>'
+                        f'<div class="bz-pdp-name">{esc(row["name"])}</div>'
+                        f'<div class="bz-big-price">{euro(row["price"])}</div><div class="bz-vat">VAT included</div>'
+                        f'<div class="bz-desc">{esc(row["description"])}</div>', unsafe_allow_html=True)
+            in_cart = row["id"] in st.session_state.cart
+            st.button("In your cart" if in_cart else "Add to cart", on_click=add_to_cart, args=(row["id"],),
+                      type="primary", disabled=in_cart, key="detail_cart",
+                      icon=":material/check:" if in_cart else ":material/shopping_bag:")
+            perk = "Free delivery" if row["price"] >= 50 else "Free delivery over €50"
+            st.markdown(f'<ul class="bz-perks"><li>{icon("truck")}{perk}</li><li>{icon("clock")}Ships in 1–2 days</li>'
+                        f'<li>{icon("return")}30-day returns, no questions asked</li></ul>', unsafe_allow_html=True)
+        st.markdown('<div class="bz-section">You might also like</div>', unsafe_allow_html=True)
+        similar = CATALOG[(CATALOG["category"] == row["category"]) & (CATALOG["id"] != row["id"])].head(4)
+        product_grid(similar, "s")
+
+    elif page == "bought":
+        st.markdown(f'<div class="bz-thanks"><div class="tick">{icon("check", 28)}</div><h1>Thank you for your order</h1>'
+                    f'<p>This shopper bought, so Nudge sends nothing: no reminder, no discount.</p></div>', unsafe_allow_html=True)
+        _, mid, _ = st.columns([1, 0.6, 1])
+        mid.button("New visitor", on_click=new_visitor, type="primary", width="stretch")

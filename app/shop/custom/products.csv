@@ -1,0 +1,17 @@
+id,name,category,price,description,photo,friend_photo
+c01,Watch That Was at Every Party,Fashion,69,Water-resistant to spilled drinks. Has seen things.,p001.jpg,p001_friend.jpg
+c02,Hatchback With Main Character Energy,Lifestyle,12990,"Five doors, four seats, one very confident driver.",p002.jpg,p002_friend.jpg
+c03,Sweater Worn to Exactly One Party,Fashion,89,Nordic pattern. Warm enough for a balcony at 3 a.m.,p003.jpg,p003_friend.jpg
+c04,Shorts for Balcony Philosophy,Fashion,45,Black denim. Best worn while explaining your startup idea.,p004.jpg,p004_friend.jpg
+c05,Hoodie for Deep Talks at the Canteen,Fashion,79,"Green, soft and suitable for long lunch breaks.",p005.jpg,p005_friend.jpg
+c06,Puffer Jacket Visible From Space,Fashion,229,Keeps you warm and findable in any Christmas photo.,p006.jpg,p006_friend.jpg
+c07,Foosball Table for Settling Arguments,Sports,489,Professional size. Friendships not included.,p007.jpg,p007_friend.jpg
+c08,Polo for Looking Busy at Brunch,Fashion,39,Black. Pairs well with an orange spritz.,p008.jpg,p008_friend.jpg
+c09,Shirt for Pretending It's a Meeting,Fashion,59,Crease-resistant. Excuses sold separately.,p009.jpg,p009_friend.jpg
+c10,Sleep Mask for Nine More Minutes,Home,19,"Blocks light, alarms and responsibilities.",p010.jpg,p010_friend.jpg
+c11,Halter Top for Golden Hour,Fashion,35,Looks best at sunset. Also fine at noon.,p011.jpg,p011_friend.jpg
+c12,Jeans for Terrace Season,Fashion,69,"Straight cut, high waist, comfortable for leaning on railings.",p012.jpg,p012_friend.jpg
+c13,Sneakers for Pretending to Be a Model,Fashion,159,Comes with an imaginary photographer.,p013.jpg,p013_friend.jpg
+c14,Glasses That Make You Look Like You Read,Fashion,179,Round tortoiseshell frame. Instant credibility.,p014.jpg,p014_friend.jpg
+c15,Microphone With a Fluffy Attitude,Tech,129,"Wind-proof, interview-ready, very pettable.",p015.jpg,p015_friend.jpg
+c16,Windbreaker for Filming Outside in November,Fashion,149,"Water-repellent, with room for a spare battery.",p016.jpg,p016_friend.jpg

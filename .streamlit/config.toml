@@ -1,0 +1,9 @@
+# Mercato demo shop: always the light shop look, even when the laptop is in dark mode.
+[theme]
+base = "light"
+primaryColor = "#14161A"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F4F1"
+textColor = "#14161A"
+borderColor = "#E6E5E1"
+baseRadius = "10px"

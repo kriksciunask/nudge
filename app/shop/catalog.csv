@@ -1,0 +1,91 @@
+id,name,category,price,description,photo_query
+p011,Toaster with Wi-Fi Anxiety,Kitchen,39,Toasts bread perfectly but checks its signal every 4 seconds.,toaster
+p012,Self-Doubting Kettle,Kitchen,29,"Boils water, then asks if that was really the right temperature.",electric kettle
+p013,Espresso Machine for Overthinkers,Kitchen,449,Makes one perfect shot after reviewing 14 alternatives.,espresso machine
+p014,Passive-Aggressive Fridge Magnet Set,Kitchen,9,"Includes ""Someone ate my yoghurt"" and ""Fine.""",fridge magnets
+p015,Pasta Measurer for Commitment Issues,Kitchen,14,Measures one portion. You will still cook four.,spaghetti
+p016,Air Fryer That Judges Your Snacks,Kitchen,129,Crispy fries with a quiet sigh at 2 a.m.,air fryer
+p017,Smart Oven with Opinions,Kitchen,899,"Bakes, roasts and rates your recipe out of ten.",oven
+p018,Blender That Sings Opera,Kitchen,189,Every smoothie comes with a short aria.,blender
+p019,Ceramic Mug for Meetings That Could Be Emails,Kitchen,19,Holds 400 ml of quiet despair.,coffee mug
+p020,Stand Mixer of Destiny,Kitchen,549,Kneads dough the way fate kneads your life.,stand mixer
+p021,Rice Cooker With a Calm Voice,Kitchen,119,"Says ""you've got this"" when the rice is done.",rice cooker
+p022,Chef's Knife Too Sharp for Mondays,Kitchen,159,Cuts tomatoes. Not corners.,chef knife
+p023,Noise-Cancelling Headphones for Group Chats,Tech,279,Blocks 98% of notifications and 100% of drama.,headphones
+p024,Laptop That Pretends to Update,Tech,1299,Gives you a ten-minute break whenever you need one.,laptop
+p025,USB-Powered Pet Rock,Tech,12,Requires no food. Requires one USB port.,pet rock
+p026,Smartwatch That Counts Your Excuses,Tech,229,"Tracks steps, sleep and every ""I'll start Monday"".",smartwatch
+p027,Bluetooth Speaker With Main Character Energy,Tech,89,Plays your entrance music when you walk in.,bluetooth speaker
+p028,Phone for People Who Never Call,Tech,699,Excellent camera. Ringtone set to silent forever.,smartphone
+p029,Tablet for Reading Terms and Conditions,Tech,349,Large screen. Nobody has ever reached the end.,tablet computer
+p030,Mechanical Keyboard for Angry Emails,Tech,149,Every key press sounds like a decision.,mechanical keyboard
+p031,Webcam With a Flattering Delay,Tech,79,You look great. Half a second later.,webcam
+p032,Drone That Follows Your Dreams,Tech,899,Also follows your neighbour's cat.,drone
+p033,Robot Vacuum With Trust Issues,Tech,399,Cleans the room then checks it again. And again.,robot vacuum
+p034,E-Reader That Skips Boring Chapters,Tech,169,Reading speed up 40%. Plot comprehension down 60%.,e-reader
+p035,Gaming Chair for Serious Napping,Tech,329,Reclines to a full 180 degrees of productivity.,gaming chair
+p036,4K Monitor for Spreadsheets Only,Tech,459,Every cell in stunning detail.,computer monitor
+p037,Power Bank With Separation Anxiety,Tech,35,Charges your phone and refuses to leave.,power bank
+p038,Wireless Mouse That Wanders Off,Tech,25,Battery life 6 months. Location unknown.,computer mouse
+p039,Anti-Monday Face Serum,Beauty,49,Visibly reduces the signs of the working week.,serum bottle
+p040,Perfume: Fresh Laptop Smell,Beauty,89,Top notes of plastic and possibility.,perfume bottle
+p041,Hair Dryer With Main Character Wind,Beauty,229,Every blow-dry looks like a music video.,hair dryer
+p042,Moisturiser for Dry Humour,Beauty,32,Clinically proven to soften sarcasm.,face cream
+p043,Electric Toothbrush That Hums Your Playlist,Beauty,119,Two minutes of brushing. Three of your favourite songs.,electric toothbrush
+p044,Nail Polish: Deadline Red,Beauty,11,Dries in 60 seconds. Like your motivation.,nail polish
+p045,Beard Oil for Philosophers,Beauty,24,Smells like cedar and unanswered questions.,beard oil
+p046,Luxury Perfume: Eau de Promotion,Beauty,289,The scent of finally being taken seriously.,perfume
+p047,Sheet Mask for Zoom Fatigue,Beauty,8,Removes the grey square look in 15 minutes.,sheet mask
+p048,Hair Straightener for Curly Plans,Beauty,139,Straightens hair. Plans remain complicated.,hair straightener
+p049,Sunscreen SPF Introvert,Beauty,19,Protects against sun and small talk.,sunscreen
+p050,Massage Gun for Inbox Tension,Beauty,249,Targets the muscle that tenses at 37 unread emails.,massage gun
+p051,Lipstick: Confident Shade of Maybe,Beauty,27,For the meeting where you finally say no.,lipstick
+p052,Silk Pillowcase for Dramatic Sleep,Beauty,59,Wake up looking like you slept eight hours.,silk pillow
+p053,Lamp That Turns Off When You Procrastinate,Home,69,Saves energy. Mostly yours.,desk lamp
+p054,Houseplant That Forgives You,Home,22,Survives three weeks without water and still loves you.,houseplant
+p055,Sofa With a Gravitational Field,Home,1199,Once you sit down the evening is over.,sofa
+p056,Scented Candle: Clean Apartment,Home,18,Your place smells tidy. It is not.,scented candle
+p057,Weighted Blanket for Heavy Thoughts,Home,129,7 kg of calm. Your problems stay but feel warmer.,blanket
+p058,Wall Clock That Runs Five Minutes Late,Home,39,You will never be early again.,wall clock
+p059,Rug That Ties the Room Together,Home,259,Your living room finally makes sense.,rug
+p060,Armchair for Reading One Page,Home,389,Comfortable enough to fall asleep by page two.,armchair
+p061,Mirror That Says You Look Rested,Home,149,Engineered optimism in a solid oak frame.,wall mirror
+p062,Bookshelf for Books You Will Read Someday,Home,219,Holds 120 good intentions.,bookshelf
+p063,Doormat: Please Have Snacks,Home,29,Sets clear expectations for guests.,doormat
+p064,Smart Thermostat With Mood Swings,Home,199,"21 °C, 23 °C, it depends how the day went.",thermostat
+p065,King-Size Bed for Snoozing Alarms,Home,999,Five snooze buttons built into the headboard.,bed
+p066,Yoga Mat for Lying Down,Sports,35,Also suitable for yoga.,yoga mat
+p067,Dumbbells That Motivate You by Being Heavy,Sports,79,"Pair of 5 kg. Each one says ""later?""",dumbbells
+p068,Running Shoes That Run Without You,Sports,139,You will still have to catch up.,running shoes
+p069,Treadmill for Hanging Laundry,Sports,799,Also has a running mode.,treadmill
+p070,Road Bike for Instagram Stories,Sports,1499,Carbon frame. Mostly ridden to cafés.,road bike
+p071,Water Bottle That Reminds You to Hydrate,Sports,24,Gently glows. Then aggressively glows.,water bottle
+p072,Tennis Racket With Excuses Built In,Sports,169,Every missed shot comes with an explanation.,tennis racket
+p073,Fitness Tracker That Believes in You,Sports,99,Counts every step. Even to the fridge.,fitness tracker
+p074,Camping Tent for Indoor Adventures,Sports,229,Fits in the living room. Fits in your heart.,tent
+p075,Skateboard for Midlife Crises,Sports,119,Comes with knee pads and a renewed sense of youth.,skateboard
+p076,Rowing Machine for Rowing Away From Problems,Sports,649,Five kilometres a day. The problems stay on shore.,rowing machine
+p077,Kettlebell Named Kevin,Sports,45,12 kg of loyal companionship.,kettlebell
+p078,Cat Bed the Cat Will Ignore,Pets,49,Your cat will sleep in the box it came in.,cat bed
+p079,Laser Pointer for Executive Meetings,Pets,15,Keeps cats and managers engaged.,laser pointer cat
+p080,Automatic Pet Feeder With Boundaries,Pets,139,Feeds the dog on time. Does not negotiate.,pet bowl
+p081,Dog Raincoat for Dramatic Walks,Pets,34,Waterproof and very serious.,dog raincoat
+p082,Aquarium for a Fish Called Budget,Pets,289,60 litres of carefully managed resources.,aquarium
+p083,Bird Cage Penthouse,Pets,259,Two floors. Sea view sticker included.,bird cage
+p084,Noise-Cancelling Earmuffs for Cats,Pets,29,For cats who have heard enough.,cat
+p085,GPS Collar for Escape Artists,Pets,109,Your dog's location in real time. His plans remain secret.,dog collar
+p086,Desk Organiser for Chaotic Geniuses,Office,27,Seven compartments. All for pens you will lose.,desk organizer
+p087,Standing Desk for Sitting at,Office,549,Electric. Height memory. Mostly in the low setting.,standing desk
+p088,Notebook for Brilliant Ideas at 3 a.m.,Office,12,Glows in the dark. Ideas may not.,notebook
+p089,Ergonomic Chair for Long Meetings,Office,489,Lumbar support for every quarterly review.,office chair
+p090,Stapler of Authority,Office,19,Red. Heavy. Do not touch.,stapler
+p091,Fountain Pen for Signing Small Things,Office,179,Makes your grocery list look like a peace treaty.,fountain pen
+p092,Label Maker for Labelling Feelings,Office,59,"Prints ""MINE"" in 12 fonts.",label maker
+p093,Whiteboard for Plans That Will Change,Office,89,Comes with three markers and an eraser that works overtime.,whiteboard
+p094,Paper Shredder for Old Resolutions,Office,119,Destroys January promises in seconds.,paper shredder
+p095,Briefcase for Carrying One Sandwich,Office,259,Genuine leather. Professional lunch transport.,leather briefcase
+p096,Desk Plant That Attends Meetings,Office,26,Sits quietly. Contributes as much as most.,succulent plant
+p097,Projector for Presentations Nobody Reads,Office,649,"3,000 lumens of slides with too much text.",projector
+p098,Calculator That Rounds Up Your Salary,Office,22,Approximately accurate.,calculator
+p099,Electric Scooter to the Fridge,Tech,529,25 km/h. Range 40 km. Usually 4 metres.,electric scooter
+p100,Vinyl Record Player for Pretending,Home,239,Plays music exactly like your phone. But warmer.,record player
