@@ -59,8 +59,8 @@ def word_counts(ids: np.ndarray) -> np.ndarray:
 
 def make_loader(features, targets, batch_size=1024, shuffle=False):
     """As in chapter5_mlp_student.ipynb c13, with targets as float for binary cross-entropy."""
-    feature_tensor = torch.as_tensor(features)
-    target_tensor = torch.as_tensor(targets, dtype=torch.float32)
+    feature_tensor = torch.as_tensor(np.array(features))                       # copy: avoids a read-only-array warning
+    target_tensor = torch.as_tensor(np.array(targets), dtype=torch.float32)
     dataset = TensorDataset(feature_tensor, target_tensor)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
@@ -93,13 +93,14 @@ def evaluate(model, loader, loss_function):
     return total_loss / total_rows, average_precision_score(labels, probs)
 
 
-def train_model(model, train_loader, val_loader, loss_function, optimizer, epochs=5, print_every=1, clip=None):
+def train_model(model, train_loader, val_loader, loss_function, optimizer, epochs=5, print_every=1, clip=None, patience=None):
     """The course training loop (chapter5 c21): forward pass, loss, backward pass, optimizer step.
     Keeps the weights of the epoch with the lowest validation loss (chapter5 c22, workshop c16).
-    clip: gradient clipping threshold θ for RNNs, g ← min(1, θ/‖g‖)·g (Week 6 s31). None = no clipping."""
+    clip: gradient clipping threshold θ for RNNs, g ← min(1, θ/‖g‖)·g (Week 6 s31). None = no clipping.
+    patience: stop when validation loss has not improved for this many epochs. None = run all epochs."""
     device = next(model.parameters()).device
     history = {"train_loss": [], "val_loss": [], "val_pr_auc": []}
-    best_loss, best_state = float("inf"), copy.deepcopy(model.state_dict())
+    best_loss, best_state, since_best = float("inf"), copy.deepcopy(model.state_dict()), 0
     for epoch in range(epochs):
         model.train()
         running, rows = 0.0, 0
@@ -119,11 +120,17 @@ def train_model(model, train_loader, val_loader, loss_function, optimizer, epoch
         history["val_loss"].append(val_loss)
         history["val_pr_auc"].append(val_pr_auc)
         if val_loss < best_loss:
-            best_loss, best_state = val_loss, copy.deepcopy(model.state_dict())
+            best_loss, best_state, since_best = val_loss, copy.deepcopy(model.state_dict()), 0
+        else:
+            since_best += 1
         if (epoch + 1) % print_every == 0:
             print(f"Epoch {epoch + 1:2d}/{epochs} | train loss {running / rows:.4f} | "
                   f"val loss {val_loss:.4f} | val PR-AUC {val_pr_auc:.3f}")
+        if patience is not None and since_best >= patience:
+            print(f"Stopped early: no improvement on validation for {patience} epochs.")
+            break
     model.load_state_dict(best_state)
+    history["best_epoch"] = int(np.argmin(history["val_loss"])) + 1
     return history
 
 

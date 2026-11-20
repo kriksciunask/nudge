@@ -70,3 +70,24 @@ assert r["left_without_nudge"] == 0
 r = money(m, m["cart_value"].to_numpy() < 0)                      # policy that sends nothing
 assert r["wasted_eur"] == 0 and r["left_without_nudge"] == 2 and r["spared_discount_came_back"] == 2, r
 print("all evaluate tests passed")
+
+# --- history words (round 2) -----------------------------------------------------------------------
+from nudge.contract import history_words, session_words  # noqa: E402
+
+h = pd.DataFrame([
+    ev(10, 0, "view", 1, 50.0, 9), ev(10, 1, "purchase", 1, 50.0, 9),      # day 10: a visit with a purchase
+    ev(12, 0, "view", 2, 50.0, 9),                                          # day 12: browsing
+    ev(20, 0, "view", 3, 50.0, 9),                                          # day 20: scored visit
+    ev(30, 0, "view", 4, 50.0, 9),                                          # day 30: 10 days later, only day 20 in window
+    ev(50, 0, "view", 8, 20.0, 8),                                          # data end marker
+    ev(0, 0, "view", 8, 20.0, 7),                                           # data start marker (day 0)
+], columns=["event_time", "event_type", "product_id", "price", "user_id", "user_session"])
+hv = build_visits(h).set_index("start_time")
+d20, d30 = hv.loc[D0 + pd.Timedelta(days=20)], hv.loc[D0 + pd.Timedelta(days=30)]
+assert d20["tokens"][:4] == ["returning", "bought_recently", "visits_2_4", "last_4_14d"], d20["tokens"]
+assert d30["tokens"][:3] == ["returning", "visits_1", "last_4_14d"], d30["tokens"]          # day-10 purchase is >14 days back
+assert session_words([], returning=False, visits_14d=3, bought_14d=True) == ["new"]
+assert session_words([], returning=True, bought_14d=True, days_since_last=0.5) == ["returning", "bought_recently", "visits_1", "last_today"]
+for t in hv["tokens"]:
+    encode(t)
+print("all history tests passed")

@@ -1,9 +1,9 @@
 """Build the training data on the Mac from the Kaggle download.
 
-Input:  data/raw/events_10pct.parquet   (1 in 10 shoppers, Oct + Nov 2019, from Kaggle kernel nudge-01-data-build)
-Output: data/raw/visits_10pct.parquet   (all abandoned visits with words, label, money, split; not in git)
+Input:  data/raw/events_<size>.parquet  (from Kaggle kernel nudge-01-data-build; 10pct = 1 in 10, 25pct = 1 in 4 shoppers)
+Output: data/raw/visits_<size>.parquet  (all abandoned visits with words, label, money, split; not in git)
         data/sample/events_sample.parquet + visits_sample.parquet  (1 in 150 shoppers; in git for the team)
-Run from the repo root:  .venv/bin/python scripts/build_training_data.py
+Run from the repo root:  .venv/bin/python scripts/build_training_data.py 25pct   (default 10pct)
 """
 import sys
 import time
@@ -15,17 +15,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from nudge.contract import build_visits  # noqa: E402
 
 t0 = time.time()
-cols = ["event_time", "event_type", "product_id", "category_code", "brand", "price", "user_id", "user_session"]
-events = pd.read_parquet("data/raw/events_10pct.parquet", columns=cols)
+size = sys.argv[1] if len(sys.argv) > 1 else "10pct"
+cols = ["event_time", "event_type", "product_id", "category_code", "price", "user_id", "user_session"]
+events = pd.read_parquet(f"data/raw/events_{size}.parquet", columns=cols)
 print(f"read {len(events):,} clicks in {time.time() - t0:.0f} s", flush=True)
 
 visits = build_visits(events)
-visits.to_parquet("data/raw/visits_10pct.parquet", index=False)
+visits.to_parquet(f"data/raw/visits_{size}.parquet", index=False)
 print(f"built {len(visits):,} visits in {time.time() - t0:.0f} s", flush=True)
 
 small = events["user_id"] % 150 == 0
-events[small].to_parquet("data/sample/events_sample.parquet", index=False)
-visits[visits["user_id"] % 150 == 0].to_parquet("data/sample/visits_sample.parquet", index=False)
+if size == "10pct":   # the team sample stays the same 1 in 150 shoppers
+    events[small].to_parquet("data/sample/events_sample.parquet", index=False)
+    visits[visits["user_id"] % 150 == 0].to_parquet("data/sample/visits_sample.parquet", index=False)
 
 v = visits
 cart = v["cart_value"] > 0
