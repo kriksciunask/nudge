@@ -93,9 +93,10 @@ def evaluate(model, loader, loss_function):
     return total_loss / total_rows, average_precision_score(labels, probs)
 
 
-def train_model(model, train_loader, val_loader, loss_function, optimizer, epochs=5, print_every=1):
+def train_model(model, train_loader, val_loader, loss_function, optimizer, epochs=5, print_every=1, clip=None):
     """The course training loop (chapter5 c21): forward pass, loss, backward pass, optimizer step.
-    Keeps the weights of the epoch with the lowest validation loss (chapter5 c22, workshop c16)."""
+    Keeps the weights of the epoch with the lowest validation loss (chapter5 c22, workshop c16).
+    clip: gradient clipping threshold θ for RNNs, g ← min(1, θ/‖g‖)·g (Week 6 s31). None = no clipping."""
     device = next(model.parameters()).device
     history = {"train_loss": [], "val_loss": [], "val_pr_auc": []}
     best_loss, best_state = float("inf"), copy.deepcopy(model.state_dict())
@@ -108,6 +109,8 @@ def train_model(model, train_loader, val_loader, loss_function, optimizer, epoch
             logits = model(features)
             loss = loss_function(logits, targets)
             loss.backward()
+            if clip is not None:
+                nn.utils.clip_grad_norm_(model.parameters(), clip)
             optimizer.step()
             running += loss.item() * len(targets)
             rows += len(targets)
