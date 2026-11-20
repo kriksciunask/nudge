@@ -15,3 +15,6 @@ __pycache__/
 
 # Keep the trained model
 !app/model.pt
+
+# Lecturer course materials (copied locally for reference, not ours to publish)
+course/

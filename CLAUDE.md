@@ -2,6 +2,12 @@
 
 This file holds the whole project context. Claude Code reads it automatically when it sits in the project folder. Keep it updated as decisions change (see "Current status" at the bottom).
 
+## Course style (read first)
+
+- docs/course-map.md maps every part of Nudge to the lecturer's slides, notebooks and the Transformers workshop, with his notation, his coding style (section 6) and the gaps the course does not cover. Explain everything in those terms and cite the slide.
+- Lecturer materials are copied in course/ (gitignored, never publish). The Chapter 2/4/5 PDFs in Downloads were a welfare-state book, not d2l, and were removed.
+- Code style to match: SEED = 42, make_loader with TensorDataset/DataLoader, train_model/evaluate returning a history dict, Adam, learning curves, ConfusionMatrixDisplay; no d2l package, no custom Dataset classes. Transformer reuses the workshop's SelfAttention/Block (d=32, heads=2, blocks=2, dropout=0.2), with a <cls>-style first token (Week 8 slide 31) and a padding mask instead of the causal mask (Week 8 slide 20).
+
 ## Who you are working with
 
 - Kristupas, Economics and Data Analytics student at ISM University (Vilnius), on a Mac. He is one of 5 group members.
@@ -56,7 +62,7 @@ This file holds the whole project context. Claude Code reads it automatically wh
 
 - Why a sequence model: a session is a sequence of clicks, like a word is a sequence of letters. Order matters: "cart → remove" (changed their mind) and "remove → cart" have the same counts but opposite meaning. Sessions have different lengths.
 - Main model: Transformer encoder. Each click attends to all other clicks (the attention function from the course workshop: softmax(QKᵀ/√d)V); position embedding keeps the order; output = one probability per session (sigmoid). Attention heatmap shows which click drove the decision (good for the presentation).
-- Alternative specification: RNN (GRU or LSTM). Reads clicks one at a time and keeps a hidden state: h_new = tanh(W·x + U·h_old + b); final hidden state → sigmoid → probability. Weakness: early clicks fade in long sessions (vanishing gradients).
+- Alternative specification: RNN (GRU or LSTM). Reads clicks one at a time and keeps a hidden state, in the lecturer's notation (Week 6 slides): H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); final hidden state → sigmoid → probability. Weakness: early clicks fade in long sessions (vanishing gradients).
 - Baselines:
   1. Rule: "discount everyone who adds to cart" (what shops do today).
   2. Logistic regression on counts (number of views, carts, removes, cart value). Ignores order.
