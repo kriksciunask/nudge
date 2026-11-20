@@ -50,3 +50,23 @@ share = s.value_counts(normalize=True)
 assert abs(share["train"] - 0.8) < 0.01 and abs(share["test"] - 0.1) < 0.01
 assert split_of(pd.Series([12345]))[0] == split_of(pd.Series([12345]))[0]
 print("all contract tests passed")
+
+# --- evaluate.py ---------------------------------------------------------------------------------
+from nudge.evaluate import money, one_per_week  # noqa: E402
+
+t = pd.Timestamp("2019-11-01")
+m = pd.DataFrame({
+    "user_id": [1, 1, 1, 2, 3],
+    "decide_time": [t, t + pd.Timedelta(days=2), t + pd.Timedelta(days=9), t, t],
+    "cart_value": [100.0, 100.0, 100.0, 50.0, 0.0],
+    "label": [1, 1, 0, 0, 1],
+    "next_order_value": [80.0, 80.0, None, None, 30.0],
+})
+give = one_per_week(m, m["cart_value"].to_numpy() > 0)
+assert give.tolist() == [True, False, True, True, False], give   # 2nd discount within 7 days blocked
+r = money(m, m["cart_value"].to_numpy() > 0)                      # industry rule: every cart abandoner
+assert r["discounts_sent"] == 3 and abs(r["wasted_eur"] - 8.0) < 1e-9, r
+assert r["left_without_nudge"] == 0
+r = money(m, m["cart_value"].to_numpy() < 0)                      # policy that sends nothing
+assert r["wasted_eur"] == 0 and r["left_without_nudge"] == 2 and r["spared_discount_came_back"] == 2, r
+print("all evaluate tests passed")
