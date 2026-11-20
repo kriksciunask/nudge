@@ -8,12 +8,13 @@ The click sequence goes to predict() (nudge/contract.py), and the decision layer
 """
 
 import sys
+import time
 from pathlib import Path
 
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from nudge.contract import IS_PLACEHOLDER, predict  # noqa: E402
+from nudge.contract import IS_PLACEHOLDER, predict, tokens_from_clicks  # noqa: E402
 from nudge.decision import (  # noqa: E402
     DISCOUNT,
     DISCOUNT_RATE,
@@ -40,17 +41,21 @@ st.set_page_config(page_title="Nudge demo shop", page_icon="🛒", layout="wide"
 
 # --- Session state: the click log (event, product) and the cart -------------------------
 if "clicks" not in st.session_state:
-    st.session_state.clicks = []  # list of (event, product_id)
+    st.session_state.clicks = []  # list of {event, product_id, price, time}
     st.session_state.cart = []  # product ids in cart
     st.session_state.left = False
 
 
 def click(event: str, pid: str) -> None:
-    st.session_state.clicks.append((event, pid))
-    if event == "cart":
-        st.session_state.cart.append(pid)
-    elif event == "remove":
+    # Remove is a demo convenience only: the training data has no remove clicks, so it is not sent to the model.
+    if event == "remove":
         st.session_state.cart.remove(pid)
+    else:
+        st.session_state.clicks.append(
+            {"event": event, "product_id": pid, "price": BY_ID[pid]["price"], "time": time.time()}
+        )
+        if event == "cart":
+            st.session_state.cart.append(pid)
     st.session_state.left = False
 
 
@@ -95,9 +100,10 @@ for i, p in enumerate(PRODUCTS):
 
 # --- Live click sequence ---------------------------------------------------------------
 st.subheader("Your clicks so far")
-session = [e for e, _ in st.session_state.clicks]
+session = tokens_from_clicks(st.session_state.clicks)
 if session:
-    st.write(" → ".join(f"`{e}` {BY_ID[pid]['icon']}" for e, pid in st.session_state.clicks))
+    st.write(" → ".join(f"{BY_ID[c['product_id']]['icon']} `{w}`" for c, w in zip(st.session_state.clicks, session)))
+    st.caption("Each click becomes one word: type, price band, 'again' if seen before, time since previous click.")
 else:
     st.caption("No clicks yet.")
 cart_value = sum(BY_ID[pid]["price"] for pid in st.session_state.cart)
