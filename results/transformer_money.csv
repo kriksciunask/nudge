@@ -1,0 +1,5 @@
+policy,discounts,€ wasted,left without a nudge,€ wasted 95%
+Industry rule (everyone),6622,50327,1568,
+Logistic regression (60%),4632,30234,3128,"26,407–34,453"
+RNN (60%),4672,28379,3052,"24,640–31,770"
+Transformer (60%),4690,26766,3051,"23,718–30,382"
