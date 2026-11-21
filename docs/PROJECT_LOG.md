@@ -307,3 +307,29 @@ Re-running a notebook trains a model, so run one at a time (the Transformer take
 **Demo and GitHub.** "The demo is a Streamlit shop called Mercato with about 100 funny products. A visitor from the audience browses and adds to cart, and the panel shows the words Nudge sees. When they leave, Nudge shows the chance they come back alone and picks no message, a reminder, or a reminder with 10% off, with a WhatsApp preview. A slider sets how generous the shop is. Everything runs from our GitHub repo with one command."
 
 **Story and slides.** "About 70% of carts are abandoned, and shops send everyone the same discount. That gives margin to people who would buy anyway and teaches shoppers to wait for coupons. Nudge decides who should get the discount. On our test shoppers, with 60% of the discounts, it wasted €26,766 instead of €50,327. The cost is that more people get no nudge. We predict; we do not prove that discounts cause sales. So the next step we propose to Hostinger is an A/B test."
+
+---
+
+## 12. Round 2: bigger sample, history words, tuning (night of 20–21 Nov)
+
+**Why.** Round 1 showed small gains (AUC 0.676 → 0.682). Two things could add signal: more data and what the shopper did before this visit. We also had never tuned the settings; all models used the workshop defaults.
+
+**Data.** Kaggle kernel `nudge-01-data-build` v3 built 1 in 4 shoppers (`user_id % 4 == 0`), Oct + Nov 2019: 27,497,039 clicks, 1.33 M shoppers. (v2 produced no file because the save cell had been removed by mistake when tidying the notebook; restored in commit 995ee41.) `scripts/build_training_data.py 25pct` on the Mac (104 s) gave **2,919,170 abandoned visits**, 8.7% come back and buy within 7 days (1-in-10 had 8.6%: consistent). Cart abandoners 224,482, 21.3% come back. Returning 11.5% vs new 3.3%. 0 shoppers in two splits.
+
+**History words** (after the start word): `bought_recently`, `visits_1` / `visits_2_4` / `visits_5plus`, `last_today` / `last_1_3d` / `last_4_14d` — all from the previous 14 days only, so nothing from the future leaks in.
+
+**Tuning (scripts/tune.py), judged only on validation shoppers.**
+- Stage 1: every setting on a 25% sample of the training visits, up to 15 epochs, early stopping (patience 2), score = validation PR-AUC at the best epoch. Grid: LR 6, RNN 8, Transformer 14 settings → results/tuning/stage1.csv.
+- Stage 2: the best 2 settings per model, on all training visits, seeds 42/43/44 → stage2.csv; models and val/test scores in results/tuned/. The test set is never used to choose anything.
+
+**Stage 1 results (validation, 25% of train):**
+
+| Model | Best setting | Val PR-AUC | Val AUC |
+|---|---|---|---|
+| Logistic regression | lr 0.003 (weight decay makes no difference) | 0.191 | 0.720 |
+| RNN | d 16, hidden 128, lr 0.001 | 0.201 | 0.728 |
+| Transformer | d 32, 3 blocks, dropout 0.1, lr 0.001 | 0.208 | 0.732 |
+
+Round 1 test AUCs were 0.676 / 0.679 / 0.682; the jump to ~0.72–0.73 comes mostly from the history words (even LR, which has no order, gains 0.04). The order of the models stays the same: Transformer > RNN > LR, with small gaps. Stage 2 and the final test numbers: see notebooks/05_evaluation.ipynb (drafted the same night, reviewed for test-set leakage by a separate reviewer: none found).
+
+**Mac care.** The chain waited for load < 8 and macOS memory pressure "free" ≥ 40% before each heavy step (the first version asked for 8 GB free+inactive, which macOS never shows because it fills spare memory with cache, so it waited for hours for nothing). One heavy job at a time, `caffeinate` so the Mac does not sleep.
