@@ -135,6 +135,34 @@ def test_look_inside_long_visit_is_capped():
     assert len(re.findall(r'class="bz-in-row', text)) == 16 and "1 earlier word not shown" in text
 
 
+def owner_html_of(at) -> str:
+    return next(m.value for m in at.markdown if 'class="ow-hero"' in m.value)
+
+
+def test_owner_view_shows_money_and_follows_slider():
+    import pandas as pd
+    curve = pd.read_csv(ROOT / "results" / "money_curve.csv").set_index("g")
+    # The curve's industry-rule row ties to the official evaluation numbers
+    assert round(curve["rule_wasted_eur"].iloc[0]) == 119729 and curve["rule_left_without_nudge"].iloc[0] == 4080
+    at = fresh()
+    next(b for b in at.button if b.label == "Leave the shop").click().run()
+    assert not at.exception, at.exception
+    for g in (50, 100):
+        at.sidebar.slider[0].set_value(g).run()
+        assert not at.exception, at.exception
+        html = owner_html_of(at)
+        assert f'{curve.loc[g / 100, "wasted_eur"]:,.0f}' in html and "119,729" in html and "A/B test" in html
+        assert at.slider[0].value == g          # the owner slider moves with the presenter slider
+
+
+def test_owner_slider_moves_the_decision_cutoffs():
+    at = fresh()
+    next(b for b in at.button if b.label == "Leave the shop").click().run()
+    at.slider[0].set_value(0).run()
+    assert not at.exception, at.exception
+    assert at.sidebar.slider[0].value == 0 and "Under 8%" in owner_html_of(at)
+
+
 if __name__ == "__main__":
     tests = [f for name, f in sorted(globals().items()) if name.startswith("test_")]
     for t in tests:

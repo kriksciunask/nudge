@@ -12,6 +12,7 @@ Screenshot shortcuts (only read when a new visitor opens the page):
   ?cart=p024,p023   start with these products in the cart
   ?view=p024        start on that product page
   ?visits=5&last=0.5&bought=1   start as a returning shopper with this history
+  ?g=0..100         start with this generosity (the slider)
   ?page=left        start on the "shopper left" result page
 """
 
@@ -436,6 +437,43 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
   .nm-chart.big { --lab: 132px; }
   .nm-chart.big .nm-zl { font-size: 14px; }
 }
+
+/* --- Owner view (leave page): the money, one hero number --------------------------------------- */
+.st-key-owner { margin-top: 40px; border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px 24px 32px; }
+.st-key-owner [data-testid="stSlider"] { max-width: 520px; }
+.ow-title { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--ink); margin: 6px 0 14px 0; line-height: 1.2; }
+.ow-zones { color: var(--muted); font-size: 14px; margin: -6px 0 0 0; }
+.ow-grid { display: grid; grid-template-columns: 5fr 7fr; gap: 40px; align-items: start; margin-top: 20px; }
+.ow-lab { font-size: 16px; line-height: 1.4; color: var(--ink-2); font-weight: 500; max-width: 420px; }
+.ow-hero { font-size: 72px; line-height: 1; font-weight: 800; letter-spacing: -.04em; color: var(--ink); margin: 10px 0 8px 0; }
+.ow-vs { font-size: 16px; color: var(--muted); }
+.ow-vs b { color: var(--ink); font-weight: 700; }
+.ow-save { display: inline-block; margin-top: 10px; background: var(--ok-soft); color: var(--ok); font-weight: 700; font-size: 15px; padding: 4px 12px; border-radius: 999px; }
+.ow-cost { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.ow-cost .n { font-size: 32px; font-weight: 800; letter-spacing: -.03em; color: var(--ink); line-height: 1.1; }
+.ow-cost .n span { font-size: 16px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.ow-cost p { margin: 6px 0 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); max-width: 420px; }
+.ow-chart { position: relative; height: 250px; margin: 14px 12px 34px 56px; }
+.ow-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ow-svg path { fill: none; vector-effect: non-scaling-stroke; }
+.ow-svg .grid { stroke: var(--line); stroke-width: 1; }
+.ow-svg .rule { stroke: var(--faint); stroke-width: 2; stroke-dasharray: 6 5; }
+.ow-svg .nudge { stroke: var(--ok); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.ow-svg .here { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 3 4; }
+.ow-y, .ow-t, .ow-x { position: absolute; font-size: 14px; line-height: 1; color: var(--muted); white-space: nowrap; }
+.ow-y { right: 100%; padding-right: 10px; transform: translateY(50%); }
+.ow-x { top: 100%; margin-top: 10px; }
+.ow-t.rule { left: 0; color: var(--muted); font-weight: 600; }
+.ow-dot { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--ok); border: 3px solid #fff; box-shadow: 0 0 0 1.5px var(--ok); }
+.ow-t.you { color: var(--ink); font-weight: 700; font-size: 15px; background: #fff; padding: 2px 4px; }
+.st-key-owner .ow-foot { margin: 28px 0 0 0 !important; color: var(--muted); font-size: 14px; line-height: 1.5; }
+@media (max-width: 900px) { .ow-grid { grid-template-columns: 1fr; gap: 24px; } }
+@media (max-width: 640px) {
+  .st-key-owner { padding: 20px 16px 18px 16px; margin-top: 24px; border-radius: 16px; }
+  .ow-title { font-size: 22px; }
+  .ow-hero { font-size: 56px; }
+  .ow-chart { height: 220px; margin: 14px 8px 34px 50px; }
+}
 .bz-wild { margin-top: 24px; border-top: 1px solid var(--line, #e7e5e1); padding-top: 16px; }
 .bz-wild-title { font-weight: 600; font-size: 15px; margin-bottom: 10px; }
 .bz-wild img { width: 100%; max-height: 420px; object-fit: cover; border-radius: 12px; display: block; }
@@ -685,6 +723,54 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
             f'<div class="nm-x"><span>start</span><span>{esc(right)}</span></div></div>')
 
 
+@st.cache_data
+def money_curve() -> pd.DataFrame | None:
+    """results/money_curve.csv (scripts/make_money_curve.py): money on the test visits for every slider value."""
+    path = ROOT.parent / "results" / "money_curve.csv"
+    return pd.read_csv(path).set_index("g") if path.exists() else None
+
+
+def owner_html(curve: pd.DataFrame, g: float) -> str:
+    """The owner's money view: one hero number, the cost, and the wasted-money curve across the slider."""
+    r = curve.loc[round(g, 2)]
+    wasted, rule = r["wasted_eur"], r["rule_wasted_eur"]
+    saved = round(100 * (1 - wasted / rule))
+    ymax = 135_000
+    gs = list(curve.index)
+    px = lambda gg: 100 * gg                                           # noqa: E731  (x in % of the plot)
+    py = lambda v: 100 - 100 * v / ymax                                # noqa: E731  (y in % from the top)
+    grid = "".join(f'<path class="grid" d="M0,{py(v):.2f} L100,{py(v):.2f}"/>' for v in (0, 50_000, 100_000))
+    ylab = "".join(f'<span class="ow-y" style="bottom:{100 - py(v):.2f}%">{"€0" if not v else f"€{v // 1000}k"}</span>'
+                   for v in (0, 50_000, 100_000))
+    line = " L".join(f"{px(k):.2f},{py(curve.loc[k, 'wasted_eur']):.2f}" for k in gs)
+    low_y = 100 - py(wasted)                                           # dot height, % from the bottom
+    where = ("right:" + f"{100 - px(g):.2f}%;" if g > 0.55 else "left:" + f"{px(g):.2f}%;")
+    below = low_y > 68 or g < 0.3
+    tag_y = f"top:calc({py(wasted):.2f}% + 14px)" if below else f"bottom:calc({low_y:.2f}% + 14px)"
+    label = (f"Discount money wasted on shoppers who would have bought anyway, by how generous the shop is. "
+             f"Discount everyone: {euro(rule)} at every setting. Nudge at this setting: {euro(wasted)}.")
+    chart = (f'<div class="ow-chart" role="img" aria-label="{esc(label)}">{ylab}'
+             f'<svg class="ow-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{grid}'
+             f'<path class="rule" d="M0,{py(rule):.2f} L100,{py(rule):.2f}"/>'
+             f'<path class="here" d="M{px(g):.2f},0 L{px(g):.2f},100"/>'
+             f'<path class="nudge" d="M{line}"/></svg>'
+             f'<span class="ow-t rule" style="bottom:calc({100 - py(rule):.2f}% + 8px)">Discount everyone: {euro(rule)}</span>'
+             f'<i class="ow-dot" style="left:{px(g):.2f}%;top:{py(wasted):.2f}%"></i>'
+             f'<span class="ow-t you" style="{where}{tag_y}">Nudge: {euro(wasted)}</span>'
+             f'<span class="ow-x" style="left:0">stingy</span><span class="ow-x" style="right:0">generous</span></div>')
+    return (f'<div class="ow-grid"><div>'
+            f'<div class="ow-lab">Discount money wasted on shoppers who would have bought anyway</div>'
+            f'<div class="ow-hero">{euro(wasted)}</div>'
+            f'<div class="ow-vs">vs <b>{euro(rule)}</b> with "discount everyone"</div>'
+            f'<div class="ow-save">{saved}% less wasted</div>'
+            f'<div class="ow-cost"><div class="n">{int(r["left_without_nudge"]):,} '
+            f'<span>vs {int(r["rule_left_without_nudge"]):,} left without a nudge and did not come back</span></div>'
+            f'<p>The price of saving margin. Whether a discount would have won them back is unknown: only an A/B test can tell.</p></div>'
+            f'</div><div>{chart}</div></div>'
+            f'<p class="ow-foot">Test set: 293k visits from shoppers the model never saw, Oct–Nov 2019, 1 in 4 shoppers of a real store (REES46). '
+            f'Money = 10% of what they actually bought when they came back.</p>')
+
+
 # --- State -----------------------------------------------------------------------------------------
 if "clicks" not in st.session_state:
     st.session_state.update(clicks=[], cart=[], page="shop", product=None, limit=PAGE_SIZE, left=False,
@@ -756,12 +842,16 @@ if _start:  # screenshot shortcuts (see the module docstring); a normal visit ha
         leave()
     v = {"1": "1", "3": "2–4", "5": "5+"}.get(qp.get("visits", ""))
     last = {"0.5": "Today", "2": "1–3 days ago", "7": "4–14 days ago"}.get(qp.get("last", ""), "1–3 days ago")
+    if qp.get("g", "").isdigit():
+        st.session_state["gen_side"] = min(100, max(0, round(int(qp["g"]) / 5) * 5))
     st.session_state.update(h_returning=bool(v), h_visits=v or "1", h_last=last, h_bought=qp.get("bought") == "1")
 
 # --- Presenter controls (sidebar, hidden until opened) ------------------------------------------------
 with st.sidebar:
     st.markdown("### Presenter controls")
-    generosity = st.slider("Shop owner: how generous with discounts?", 0, 100, 50, step=5) / 100
+    # One value, two sliders: this one (presenter) and the one in the owner view on the leave page
+    st.session_state.setdefault("gen_side", 50)
+    generosity = st.slider("Shop owner: how generous with discounts?", 0, 100, step=5, key="gen_side") / 100
     low, high = cutoffs(generosity)
     st.caption(f"Under {low:.0%}: no message · {low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%} · over {high:.0%}: reminder only")
     returning = st.toggle("This customer has visited in the last 14 days", key="h_returning")
@@ -891,6 +981,16 @@ if page == "left":
         f'</div><div class="bz-phonecol"><div class="bz-phone"><div class="bz-phone-top"><div class="bz-ava">m</div><div><b>{SHOP}</b>'
         f'<small>Message preview · WhatsApp-style</small></div></div><div class="bz-chat">{chat}</div></div>'
         f'</div></div>', unsafe_allow_html=True)
+    curve = money_curve()
+    if curve is not None:
+        with st.container(key="owner"):
+            st.markdown('<div class="bz-eyebrow" style="margin-top:0">For the shop owner</div>'
+                        '<div class="ow-title">What the discounts cost you</div>', unsafe_allow_html=True)
+            st.session_state["gen_main"] = st.session_state["gen_side"]
+            st.slider("How generous with discounts?", 0, 100, step=5, key="gen_main",
+                      on_change=lambda: st.session_state.update(gen_side=st.session_state["gen_main"]))
+            st.markdown(f'<p class="ow-zones">Under {low:.0%}: no message · {low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%} · over {high:.0%}: reminder only</p>'
+                        + owner_html(curve, generosity), unsafe_allow_html=True)
     section, gridhtml = inside_html(words, p)
     st.markdown(section, unsafe_allow_html=True)
     with st.container(key="gridbox"):
