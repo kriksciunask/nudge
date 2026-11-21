@@ -95,6 +95,14 @@ def test_summary_separates_shopping_from_left():
     assert (s["left_carts"], s["left_carts_discounted"]) == (2, 1) and s["left_held_value"] == 80.0
 
 
+def test_duplicate_nicknames_get_a_suffix():
+    b = LiveBoard()
+    write(b, "a", nick="Mantas")
+    write(b, "b", nick="mantas")
+    write(b, "c", nick="Mantas")
+    assert sorted(r["nick"] for r in b.snapshot()) == ["Mantas", "Mantas 3", "mantas 2"]
+
+
 def test_demo_fill():
     b = LiveBoard()
     fill_demo(b, 12)

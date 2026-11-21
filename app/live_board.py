@@ -112,6 +112,19 @@ def _card(r: dict, now: float) -> str:
             f'<div class="r3"><i></i>{html.escape(line)}</div></div>')
 
 
+def _card_small(r: dict, now: float, grp: str = "") -> str:
+    """Compact card for a crowded room: name, chance, decision (no sparkline)."""
+    left = r["status"] == "left"
+    just = left and r["left_at"] and now - r["left_at"] < JUST_LEFT_SECONDS
+    cls = ("left just" + (" fresh" if now - r["left_at"] < 3 else "")) if just else ("left" if left else "")
+    line = "Bought" if r["status"] == "bought" else (f"Left → {LEFT_NAME[r['zone']]}" if left else ZONE_NAME[r["zone"]])
+    if r["status"] == "bought":
+        cls = "bought"
+    return (f'<div class="bd-card c {grp} z{r["zone"]} {cls}"><div class="r1"><b>{html.escape(r["nick"])}</b>'
+            f'<span class="pct">{round(r["chance"] * 100)}<sup>%</sup></span></div>'
+            f'<div class="r3"><i></i>{html.escape(line)}</div></div>')
+
+
 def _body(rows: list[dict], now: float) -> str:
     if not rows:
         return ('<div class="bd-eyebrow"><i></i>Nudge · live audience board</div>'
@@ -124,29 +137,42 @@ def _body(rows: list[dict], now: float) -> str:
     cells = "".join(f'<div class="cell z{z}"><b>{s[k]}</b><span>{ZONE_NAME[z]}</span>'
                     + (f'<em>+{s[kl]} left</em>' if s[kl] else "") + '</div>'
                     for z, k, kl in ((1, "discount", "left_discount"), (2, "reminder", "left_reminder"), (0, "none", "left_none")))
-    # shopping now first (most recent activity), then the "Already left" group
+    # shopping now first (most recent activity), then the "Already left" row, which always shows the newest leavers.
+    # Above 15 active shoppers the cards turn compact (no sparkline) and more fit.
     now_rows = [r for r in rows if r["status"] != "left"]
     left_rows = [r for r in rows if r["status"] == "left"]
-    cards = "".join(_card(r, now) for r in now_rows[:MAX_CARDS])
-    room = MAX_CARDS - min(len(now_rows), MAX_CARDS)
-    if left_rows and room > 0:
-        cards += '<div class="bd-sep">Already left</div>' + "".join(_card(r, now) for r in left_rows[:room])
-    more = f'<div class="bd-more">+{len(rows) - MAX_CARDS} more shoppers</div>' if len(rows) > MAX_CARDS else ""
+    compact = len(now_rows) > 9
+    cap_now, cap_left = (24, 6) if compact else (9, 5)
+    draw = (lambda r, n, g: _card_small(r, n, g)) if compact else (lambda r, n, g: _card(r, n))
+    cards = "".join(draw(r, now, "act") for r in now_rows[:cap_now])
+    if left_rows:
+        cards += '<div class="bd-sep">Already left</div>' + "".join(draw(r, now, "lft") for r in left_rows[:cap_left])
+    def more_text(cn: int, cl: int) -> str:
+        extra = [f"+{len(now_rows) - cn} more shopping"] if len(now_rows) > cn else []
+        extra += [f"+{len(left_rows) - cl} more left"] if len(left_rows) > cl else []
+        return " · ".join(extra)
+    # on narrower screens CSS shows fewer compact cards (12 shopping, 4 left), so that text has its own counts
+    wide, narrow = more_text(cap_now, cap_left), more_text(12 if compact else cap_now, 4 if compact else cap_left)
+    more = (f'<div class="bd-more"><span class="wide">{wide}</span><span class="narrow">{narrow}</span></div>'
+            if (wide or narrow) else "")
     if s["left_carts"] >= 5:
         held = DISCOUNT_RATE * s["left_held_value"]
-        total = (f'Leavers with a cart: <b>{s["left_carts"]}</b> · Discount everyone gives <b>{s["left_carts"]}</b> discounts · '
-                 f'Nudge gives <b>{s["left_carts_discounted"]}</b> and holds back <b>€{held:,.0f}</b> of discounts '
-                 f'({DISCOUNT_RATE:.0%} of those carts)')
+        none_given = s["left_carts"] - s["left_carts_discounted"]
+        room = (f'<div class="bd-held"><div class="h"><b>€{held:,.0f}</b><span>held back</span></div>'
+                f'<div class="h"><b>{none_given}</b><span>cart leavers got no discount: whether they return is unknown</span></div></div>')
+        total = (f'<div class="bd-total">Leavers with a cart: <b>{s["left_carts"]}</b> · discount everyone gives <b>{s["left_carts"]}</b> · '
+                 f'Nudge gives <b>{s["left_carts_discounted"]}</b> · €{held:,.0f} = {DISCOUNT_RATE:.0%} of the carts it did not discount</div>')
     else:
-        total = "Room total appears after 5 shoppers leave with a cart"
+        room = ""
+        total = '<div class="bd-total">Room total appears after 5 shoppers leave with a cart</div>'
     return (f'<div class="bd-eyebrow"><i></i>Nudge · live audience board</div>'
-            f'<div class="bd-hero"><span class="num">{s["shoppers"]}</span><span class="lab">joined · '
-            f'<b>{s["shopping"]}</b> shopping now</span></div>'
-            f'<div class="bd-sum"><div class="t">If they left this second, Nudge would send <span>(hatched: already left, final)</span></div>'
+            f'<div class="bd-herorow"><div class="bd-hero"><span class="num">{s["shoppers"]}</span><span class="lab">joined · '
+            f'<b>{s["shopping"]}</b> shopping now</span></div>{room}</div>'
+            f'<div class="bd-sum"><div class="t">If they left this second, Nudge would send <span><span class="sw"></span>hatched = already left, final</span></div>'
             f'<div class="bar" role="img" aria-label="Nudge decisions across the room">{segs}</div>'
             f'<div class="cells">{cells}</div>'
             f'<div class="bd-total">{total}</div></div>'
-            f'<div class="bd-grid">{cards}</div>{more}')
+            f'<div class="bd-grid{" c" if compact else ""}">{cards}</div>{more}')
 
 
 @st.fragment(run_every=2)
@@ -198,7 +224,24 @@ CSS = """
 .bd-sum { margin-bottom: 22px; }
 .bd-sum .t { font-size: 20px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
 .bd-sum .bar { display:flex; height: 18px; border-radius: 9px; overflow:hidden; background: var(--soft-2); gap:3px; }
-.bd-sum .t span { font-weight: 500; }
+.bd-sum .t span { font-weight: 500; margin-left: 14px; }
+.bd-sum .t .sw { display: inline-block; width: 38px; height: 14px; margin: 0 8px 0 0; vertical-align: -1px; border-radius: 4px; background-color: var(--ink-2);
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.8) 0 3px, transparent 3px 8px); }
+.bd-herorow { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 48px; }
+.bd-held { display: flex; gap: 40px; align-items: flex-start; padding-bottom: 8px; }
+.bd-held .h { display: flex; align-items: center; gap: 14px; max-width: 330px; }
+.bd-held b { font-size: clamp(56px, 8vh, 84px); font-weight: 800; letter-spacing: -.04em; line-height: 1; color: var(--ink); }
+.bd-held span { font-size: 20px; font-weight: 700; line-height: 1.25; color: var(--ink-2); }
+.bd-grid.c { grid-template-columns: repeat(auto-fill, minmax(214px, 1fr)); gap: 10px; }
+.bd-card.c { min-height: 0; padding: 8px 12px; gap: 2px; }
+.bd-card.c .r1 { align-items: baseline; } .bd-card.c .pct { font-size: 28px; } .bd-card.c .pct sup { font-size: 16px; }
+.bd-card.c.just { padding: 7px 11px; }
+.bd-more .narrow { display: none; }
+@media (max-width: 1600px) {
+  .bd-grid.c > .act:nth-child(n+13) { display: none; }
+  .bd-grid.c > .bd-sep + .lft + .lft + .lft + .lft ~ .lft { display: none; }
+  .bd-more .wide { display: none; } .bd-more .narrow { display: inline; }
+}
 .cell em { font-style: normal; font-size: 20px; font-weight: 600; color: var(--faint); }
 .bd-sep { grid-column: 1 / -1; margin-top: 6px; font-size: 20px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .seg.z0 { background: var(--faint); } .seg.z1 { background: var(--accent); } .seg.z2 { background: var(--ink); }

@@ -245,7 +245,7 @@ def test_room_total_after_five_leavers_with_a_cart():
     for i in range(5):                       # 5 leavers with a cart: 2 got +10% (zone 1), 3 did not
         store.update(f"x{i}", hist=[0.1], zone=1 if i < 2 else 2, cart_value=100.0, n_cart=1, status="left")
     html = board_html(board_app())
-    assert "Leavers with a cart: <b>5</b>" in html and "Nudge gives <b>2</b>" in html and "€30" in html
+    assert "Leavers with a cart: <b>5</b>" in html and "Nudge gives <b>2</b>" in html and "€30" in html and "whether they return is unknown" in html
     assert "Room total appears" not in html and "margin" not in html.lower()
     store.reset()
 

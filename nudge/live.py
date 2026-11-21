@@ -89,6 +89,12 @@ class LiveBoard:
         with self._lock:
             self._expire(now)
             rows = [dict(r, hist=list(r["hist"])) for r in self._rows.values() if include_hidden or not r["hidden"]]
+        seen: dict[str, int] = {}
+        for r in sorted(rows, key=lambda r: r["n"]):             # same nickname twice: the later joiner gets "Name 2"
+            k = r["nick"].lower()
+            seen[k] = seen.get(k, 0) + 1
+            if seen[k] > 1:
+                r["nick"] = f'{r["nick"]} {seen[k]}'
         rows.sort(key=lambda r: r["last_seen"], reverse=True)
         return rows
 
@@ -154,7 +160,7 @@ def fill_demo(board: LiveBoard, n: int = 12) -> None:
             hist.append(p)
         zone = 0 if p < 0.065 else (1 if p < 0.215 else 2)
         status = "left" if i % 4 == 1 else "shopping"
-        value = rng.choice([0, 0, 39, 85, 120, 240])
+        value = rng.choice([39, 85, 120, 240] if i % 4 == 1 else [0, 0, 39, 85, 120, 240])   # leavers always have a cart
         board.update(sid, hist=hist, zone=zone, cart_value=value, n_cart=0 if not value else rng.choice([1, 2]), status="shopping", nick=names[i % len(names)] if i % 3 else None)
         with board._lock:
             row = board._rows[sid]
