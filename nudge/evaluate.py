@@ -107,3 +107,22 @@ def bootstrap(visits: pd.DataFrame, fn, n: int = 200, seed: int = 0) -> dict:
         vals = np.array([d[key] for d in draws], dtype=float)
         out[key] = (float(np.nanpercentile(vals, 2.5)), float(np.nanpercentile(vals, 97.5)))
     return out
+
+
+def industry_rule_score(visits: pd.DataFrame) -> np.ndarray:
+    """Today's rule as a score: 1.0 if the visit left a cart, else 0.0. No random tie-break noise:
+    the many tied visits are handled by sklearn's AUC / PR-AUC exactly (a tie counts as half a win),
+    so the rule's scores are the same on every run and every computer."""
+    return (visits["cart_value"].to_numpy() > 0).astype(np.float64)
+
+
+def top_share_rate(y: np.ndarray, score: np.ndarray, share: float = 0.10) -> float:
+    """Come-back rate among the `share` of visits with the highest score.
+    If the line falls inside a group of tied scores, that group counts in proportion: the places left
+    are filled at the group's own come-back rate. So the answer never depends on row order."""
+    y, score = np.asarray(y, dtype=float), np.asarray(score)
+    n_top = max(1, int(round(share * len(score))))
+    line = np.sort(score)[::-1][n_top - 1]          # score of the last visit inside the top
+    above, tied = score > line, score == line
+    places_left = n_top - above.sum()               # how many of the tied visits fit in the top
+    return float((y[above].sum() + places_left * y[tied].mean()) / n_top)

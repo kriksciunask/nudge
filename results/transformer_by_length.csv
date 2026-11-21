@@ -1,0 +1,6 @@
+,Logistic regression,RNN,Transformer
+1 click,0.657,0.657,0.656
+2–3 clicks,0.658,0.657,0.662
+4–7 clicks,0.633,0.642,0.646
+8–15 clicks,0.634,0.628,0.638
+16+ clicks,0.637,0.636,0.646

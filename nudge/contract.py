@@ -64,9 +64,13 @@ def click_token(event: str, price: float, again: bool, seconds_since_prev: float
 
 
 START_WORDS = ["new", "returning"]
+# History words (added 20 Nov, round 2), all from the previous LOOKBACK_DAYS only, placed right after the start word:
+HISTORY_WORDS = ["bought_recently",                         # bought something in the previous 14 days
+                 "visits_1", "visits_2_4", "visits_5plus",   # how many visits in the previous 14 days
+                 "last_today", "last_1_3d", "last_4_14d"]    # time since the end of the previous visit
 
 # --- Vocabulary: every possible word gets a number (index 0 = padding) ------------------------------
-VOCAB = ["<pad>"] + START_WORDS + [
+VOCAB = ["<pad>"] + START_WORDS + HISTORY_WORDS + [
     "_".join(p for p in (e, b, r, g) if p)
     for e, b, r, g in itertools.product(CLICK_TYPES, PRICE_BANDS, REPEAT, GAP_BANDS)
 ]
@@ -94,9 +98,31 @@ def tokens_from_clicks(clicks: list[dict]) -> list[str]:
     return words
 
 
-def session_words(clicks: list[dict], returning: bool) -> list[str]:
-    """The full model input for one visit: start word + click words. Used by the app."""
-    return ["returning" if returning else "new"] + tokens_from_clicks(clicks)
+def history_words(visits_14d: int, bought_14d: bool, days_since_last: float | None) -> list[str]:
+    """What we know about the shopper's previous 14 days, as words. Empty for a new shopper."""
+    words = []
+    if bought_14d:
+        words.append("bought_recently")
+    if visits_14d >= 5:
+        words.append("visits_5plus")
+    elif visits_14d >= 2:
+        words.append("visits_2_4")
+    elif visits_14d == 1:
+        words.append("visits_1")
+    if days_since_last is not None and visits_14d > 0:
+        words.append("last_today" if days_since_last < 1 else "last_1_3d" if days_since_last < 4 else "last_4_14d")
+    return words
+
+
+def session_words(clicks: list[dict], returning: bool, visits_14d: int = 0, bought_14d: bool = False,
+                  days_since_last: float | None = None) -> list[str]:
+    """The full model input for one visit: start word + history words + click words. Used by the app."""
+    if not returning:
+        visits_14d, bought_14d, days_since_last = 0, False, None
+    elif visits_14d == 0:
+        visits_14d = 1
+    return (["returning" if returning else "new"] + history_words(visits_14d, bought_14d, days_since_last)
+            + tokens_from_clicks(clicks))
 
 
 # --- Building the training data (rules decided 20 Nov after the data audit) -------------------------
@@ -112,7 +138,10 @@ def clean_events(events: pd.DataFrame) -> pd.DataFrame:
     ev = events.drop_duplicates(subset=["event_time", "event_type", "product_id", "user_id", "user_session"]).copy()
     ev = ev[ev["price"] > 0]
     ev["event_type"] = ev["event_type"].astype(str)
-    ev["time"] = pd.to_datetime(ev["event_time"].astype(str).str.replace(" UTC", "", regex=False))
+    if pd.api.types.is_datetime64_any_dtype(ev["event_time"]):          # the 1-in-4 build stores real dates
+        ev["time"] = ev["event_time"].dt.tz_localize(None) if ev["event_time"].dt.tz is not None else ev["event_time"]
+    else:
+        ev["time"] = pd.to_datetime(ev["event_time"].astype(str).str.replace(" UTC", "", regex=False))
     ev["t"] = (ev["time"] - pd.Timestamp("1970-01-01")).dt.total_seconds()
     ev["rank"] = ev["event_type"].map(EVENT_ORDER)
     ev = ev.sort_values(["user_id", "time", "rank"], kind="stable").reset_index(drop=True)
@@ -147,9 +176,28 @@ def build_visits(events: pd.DataFrame) -> pd.DataFrame:
     v["has_purchase"] = pd.Series(is_buy).groupby(ev["visit"]).any()
     v["order_value"] = ev["price"].where(is_buy, 0.0).groupby(ev["visit"]).sum()
 
-    # Start word: any visit by the same shopper starting in the previous LOOKBACK_DAYS
-    prev_start = v.groupby("user_id")["start"].shift(1)
-    v["returning"] = (v["start"] - prev_start) <= LOOKBACK_DAYS * 86400
+    # History from the previous LOOKBACK_DAYS only (visits are sorted by shopper, then time):
+    # number of earlier visits, whether any of them had a purchase, time since the previous visit ended.
+    starts, lasts = v["start"].to_numpy(), v["last"].to_numpy()
+    buys_cum = np.cumsum(v["has_purchase"].to_numpy().astype(int))
+    users = v["user_id"].to_numpy()
+    group_start = np.r_[0, np.flatnonzero(users[1:] != users[:-1]) + 1]
+    group_end = np.r_[group_start[1:], len(v)]
+    n_recent = np.zeros(len(v), dtype=int)
+    bought = np.zeros(len(v), dtype=bool)
+    for g0, g1 in zip(group_start, group_end):
+        lo = g0 + np.searchsorted(starts[g0:g1], starts[g0:g1] - LOOKBACK_DAYS * 86400, side="left")
+        idx = np.arange(g0, g1)
+        n_recent[g0:g1] = idx - lo
+        before = np.where(idx > g0, buys_cum[idx - 1], 0)
+        at_lo = np.where(lo > g0, buys_cum[lo - 1], 0)
+        bought[g0:g1] = (before - at_lo) > 0
+    prev_last = np.r_[np.nan, lasts[:-1]]
+    prev_last[group_start] = np.nan
+    v["visits_14d"] = n_recent
+    v["bought_14d"] = bought
+    v["days_since_last"] = (starts - prev_last) / 86400
+    v["returning"] = v["visits_14d"] > 0
 
     # Label: first later visit WITH a purchase, starting after the decision moment
     v["decide"] = v["last"] + IDLE_MINUTES * 60
@@ -170,9 +218,11 @@ def build_visits(events: pd.DataFrame) -> pd.DataFrame:
     lo, hi = bounds[: len(a)], bounds[len(a):]
     et, pid, pr = ev["event_type"].to_numpy(), ev["product_id"].to_numpy(), ev["price"].to_numpy()
     tokens, cart_values = [], []
-    for i, j, ret in zip(lo, hi, a["returning"].to_numpy()):
+    for i, j, ret, nv, bt, dl in zip(lo, hi, a["returning"].to_numpy(), a["visits_14d"].to_numpy(),
+                                     a["bought_14d"].to_numpy(), a["days_since_last"].to_numpy()):
         clicks = [{"event": et[k], "product_id": pid[k], "price": pr[k], "time": t[k]} for k in range(i, j)]
-        tokens.append(["returning" if ret else "new"] + tokens_from_clicks(clicks))
+        tokens.append(["returning" if ret else "new"] + history_words(int(nv), bool(bt), None if np.isnan(dl) else float(dl))
+                      + tokens_from_clicks(clicks))
         carted = {pid[k]: pr[k] for k in range(i, j) if et[k] == "cart"}
         cart_values.append(float(sum(carted.values())))
     a["tokens"] = tokens
@@ -181,7 +231,7 @@ def build_visits(events: pd.DataFrame) -> pd.DataFrame:
     a["decide_time"] = pd.to_datetime(a["decide"], unit="s")
     a["split"] = split_of(a["user_id"])
     return a[["visit", "user_id", "start_time", "decide_time", "tokens", "n_clicks", "cart_value",
-              "label", "days_to_buy", "next_order_value", "split"]]
+              "visits_14d", "bought_14d", "days_since_last", "label", "days_to_buy", "next_order_value", "split"]]
 
 
 def split_of(user_ids: pd.Series) -> pd.Series:

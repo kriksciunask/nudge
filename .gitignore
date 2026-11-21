@@ -23,3 +23,6 @@ course/
 .env
 !app/shop/*.csv
 !app/shop/custom/*.csv
+!results/*.csv
+!results/tuning/
+!results/tuning/*.csv

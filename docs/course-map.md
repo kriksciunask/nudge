@@ -14,7 +14,7 @@ Built 20 Nov 2026 from the files in `course/`. Every claim cites a file and a sl
 | Index → vector | One-hot vector | W3 s21; W6 s29 | label y=1 → [0,1,0]; "an index is a name, not a quantity" | Word id 17 is not "more" than id 3. That is why we never feed raw ids. |
 | Index → learned vector | Embeddings | W8 s26, s34 ("What each token means (embeddings)"); WS c15 `nn.Embedding(vocab_size, d)` | tokens → embedding + position | Each click word gets a learned vector of length d. |
 | A visit is a sequence | Sequence, time step, "sequence → one" | W6 s20, s21 | x₁, …, x_T; "varying length, order matters"; example "sentiment of a review" | One visit (any length) → one yes/no. The same shape as review sentiment. |
-| Counts-only baseline | Logistic regression as a perceptron | W3 s16–s19; AK p19 (Vignette B) | z = Σ wᵢxᵢ, p = σ(z) = 1/(1+e^(−z)); ŷ = 1 if p ≥ 0.5 | Our LR on word counts (AUC 0.675). |
+| Counts-only baseline | Logistic regression as a perceptron | W3 s16–s19; AK p19 (Vignette B) | z = Σ wᵢxᵢ, p = σ(z) = 1/(1+e^(−z)); ŷ = 1 if p ≥ 0.5 | Our LR on word counts (AUC 0.676; scikit-learn cross-check 0.675). |
 | Why counts are not enough | Vignette E "Read Between the Lines" | RS p18; AK p21 | "LR on word counts … throws away order" → RNN | The lecturer's own argument for our ladder: counts → RNN → Transformer. |
 | Probability output | Sigmoid; softmax for q classes | W3 s16–s17, s20, s22; W8 s8 | σ(z); "Features → logits → softmax probabilities → decisions" | Our model ends in one logit → σ → chance to come back. |
 | Loss | Negative log-likelihood = cross-entropy | W3 s18; W8 s8 | L(w) = −Σᵢ [y⁽ⁱ⁾ log σ(z⁽ⁱ⁾) + (1−y⁽ⁱ⁾) log(1−σ(z⁽ⁱ⁾))]; "−log ŷ_true class" | This is our binary cross-entropy loss. |
@@ -27,9 +27,9 @@ Built 20 Nov 2026 from the files in `course/`. Every claim cites a file and a sl
 | Dropout | Dropout | W2 s32; NB5 c14; RS Q10 | `nn.Dropout(0.20)` | WS Transformer uses dropout 0.2. |
 | Early stopping | "Keep the best validation weights" (the words "early stopping" are not found) | NB5 c22; WS c16 | "We keep the model from the lowest point of the orange line" | Keep the epoch with the best valid score. |
 | MLP, activations | Hidden layers, ReLU, nonlinearity | W3 s25–s27; W6 s10–s12; W4 s27 | ReLU(z) = max(0, z); without it "layers collapse into one linear layer" | The feed-forward part of each Transformer block is a small MLP. |
-| RNN | Hidden state | W6 s28; W8 s12; AK p15 | H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); O_t = H_t W_hq + b_q; φ = tanh | Our GRU baseline reads clicks one by one; the final H_T → sigmoid. |
+| RNN | Hidden state | W6 s28; W8 s12; AK p15 | H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); O_t = H_t W_hq + b_q; φ = tanh | Our plain RNN reads clicks one by one; the final H_T → sigmoid. |
 | RNN training | BPTT, vanishing/exploding gradients, clipping | W6 s31; W8 s13; AK p15 | 0.5⁵⁰ ≈ 10⁻¹⁵; g ← min(1, θ/‖g‖) g | Early clicks of long visits fade. |
-| GRU / LSTM | Gated RNNs (named only) | W6 s31; W2 s32; AK p15 ("Chapter 10") | No gate equations found | Gate formulas: not found in the materials. |
+| GRU / LSTM | Gated RNNs (named only) | W6 s31; W2 s32; AK p15 ("Chapter 10") | No gate equations found | Not used in Nudge (decided 20 Nov): not taught, so we keep the plain RNN. |
 | Attention | Queries, keys, values; scaled dot product | W8 s17–s20; WS c5–c6 | softmax(QKᵀ/√d)V; worked example 0.67/0.24/0.09 | Each click looks at every other click. |
 | Multi-head | h heads, concatenate, one linear layer | W8 s23; WS c15 `SelfAttention` | "Like channels in a CNN: many heads, many questions" | Two heads in the workshop model. |
 | Order | Positional encoding (fixed waves or learned) | W8 s25 | p_{i,2j} = sin(i/10000^{2j/d}); X + P | We use the workshop's learned `position_embedding`. |

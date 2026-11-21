@@ -1,0 +1,8 @@
+policy,share,discounts,€ wasted,€ wasted 95%,"spared, came back",left without a nudge
+Industry rule (everyone),100%,6622,50327,"44,510–56,529",651,1568
+Logistic regression,80%,5742,40298,"35,384–45,417",865,2234
+Random,80%,5505,42737,"37,431–48,432",834,2502
+Logistic regression,60%,4619,30202,"26,380–34,426",1084,3138
+Random,60%,4326,35745,"30,970–40,977",1017,3498
+Logistic regression,40%,3369,19756,"17,239–22,835",1335,4137
+Random,40%,3047,26242,"21,839–30,908",1250,4544

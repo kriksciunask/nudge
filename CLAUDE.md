@@ -62,10 +62,10 @@ This file holds the whole project context. Claude Code reads it automatically wh
 
 - Why a sequence model: a session is a sequence of clicks, like a word is a sequence of letters. Order matters: "cart → remove" (changed their mind) and "remove → cart" have the same counts but opposite meaning. Sessions have different lengths.
 - Main model: Transformer encoder. Each click attends to all other clicks (the attention function from the course workshop: softmax(QKᵀ/√d)V); position embedding keeps the order; output = one probability per session (sigmoid). Attention heatmap shows which click drove the decision (good for the presentation).
-- Alternative specification: RNN (GRU or LSTM). Reads clicks one at a time and keeps a hidden state, in the lecturer's notation (Week 6 slides): H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); final hidden state → sigmoid → probability. Weakness: early clicks fade in long sessions (vanishing gradients).
+- Alternative specification: plain RNN (decided 20 Nov: no GRU/LSTM, because the course does not teach their gate equations). Reads clicks one at a time and keeps a hidden state, in the lecturer's notation (Week 6 slides): H_t = φ(X_t W_xh + H_{t−1} W_hh + b_h); final hidden state → sigmoid → probability. Weakness: early clicks fade in long sessions (vanishing gradients).
 - Baselines:
   1. Rule: "discount everyone who adds to cart" (what shops do today).
-  2. Logistic regression on counts (number of views, carts, removes, cart value). Ignores order.
+  2. Logistic regression on counts of every click word (62 words). Ignores order. Built in PyTorch as nn.Linear + sigmoid to match the course; scikit-learn only as a cross-check.
 - Story of the comparison: does order matter (RNN vs counts)? Do long sessions matter (Transformer vs RNN, compare on short vs long sessions)?
 - Reuse: the course workshop (Part 1, name generator) has a working small Transformer in PyTorch (NameGPT: attention, causal_mask, SelfAttention, Block) and a Streamlit app.py. Kristupas has these files; reuse the structure, but change the task from "predict the next letter" to "one yes/no per session". For whole-session classification a causal mask is not required.
 
@@ -84,7 +84,7 @@ This file holds the whole project context. Claude Code reads it automatically wh
   0. Random: guess "buys" at the real buy rate (the floor).
   1. Industry rule: "left a cart → reminder + 10% to everyone". This is how Hostinger Reach (1 h after abandonment, email, subscribers only), Shopify (default 10 h; optional discount code on every recovery email) and Klaviyo (first email after 4 h, 2–3 emails) work: none of them decides WHO gets the discount. Sources: hostinger.com/support/?p=8204, help.shopify.com/en/manual/discounts/discounts-for-abandoned-checkout-recovery-emails, help.klaviyo.com/hc/en-us/articles/115002779411, klaviyo.com/blog/abandoned-cart-tips (warns repeat discounts train shoppers to wait).
   2. Logistic regression on counts of every word (no order).
-  3. RNN (GRU): required by the course as the alternative specification to the Transformer.
+  3. Plain RNN (Week 6 formula): required by the course as the alternative specification to the Transformer. GRU was tried and removed (not taught).
   4. Transformer (main model).
   Scores: precision, recall, F1, AUC; and money (below).
 - Money (measurable, no invented conversion rates): (a) MARGIN SAVED = discount € the industry rule gives to shoppers who come back and buy anyway, minus what Nudge gives them; (b) SHOPPERS LEFT WITHOUT A NUDGE = people Nudge skipped who did not buy (whether a discount would have converted them is unknown; only an A/B test can say). Any "extra sales from nudging" in the demo is a labelled assumption on a slider.
@@ -147,7 +147,7 @@ nudge/  (repo root)
   app/model.pt         trained model
 ```
 
-- Heavy data work and training: Kaggle Notebooks (dataset attached directly, free GPU). Save the notebooks into the repo.
+- Kaggle only extracts the raw clicks (01_data_build). Visits are built and ALL models are trained on Kristupas's Mac (decided 20 Nov). Save the notebooks into the repo.
 - Never commit data files. Commit and push at the end of every working session.
 - Local Python: use 3.12 or 3.13 (PyTorch may not support 3.15 yet). On Kristupas's Mac: `python3.13`.
 
@@ -224,7 +224,12 @@ Every member must be able to explain the whole model. Around 2 December each per
   - Still to do in evaluation: bootstrap uncertainty (by shopper) on every number; Oct→Nov check trains only on visits deciding by Oct 24; failure #3 becomes "shoppers who are not logged in are invisible".
   - Training on the Mac: try CPU vs MPS for one epoch; cut visits to the last 64 words; seeds saved with model.pt; DataLoader num_workers=0; one heavy job at a time.
 - 20 Nov FULL DATA (scripts/build_training_data.py, 25 s on the Mac): 1,166,494 abandoned visits from 1 in 10 shoppers (Oct 15–Nov 23 decisions); 8.6% come back and buy within 7 days; cart abandoners 89,417 with 21.1% coming back anyway; returning 11.5% vs new 3.3%; October 7.4% vs November 9.3%. Words per visit p50 4, p99 45. data/raw/visits_10pct.parquet (36 MB, not in git); team sample data/sample/visits_sample.parquet (1 in 150 shoppers).
+- 20 Nov MODELS (all on the same 117,531 test visits, see docs/PROJECT_LOG.md): industry rule AUC 0.558; logistic regression 0.676; plain RNN 0.679; Transformer 0.682 (PR-AUC 0.168). Paired bootstrap: Transformer − RNN +0.0034 (95% +0.0018..+0.0050), clearly better but small. Top-10% of Transformer scores come back 20.5% vs 8.6% average. Accuracy is 91.4% for every model = same as "always no", so never quote accuracy. Transformer: workshop attention/SelfAttention/Block, padding mask, FIRST-position (<cls>-style) summary, AdamW lr 0.001 (workshop used 0.003), 6 epochs, CPU. GRU tried (AUC 0.682, PR-AUC 0.172) and removed because the course does not teach it.
+- 20 Nov NEXT ROUND (Kristupas): bigger data 1 in 4 shoppers (Kaggle kernel v2, events_25pct.parquet); history start words from the previous 14 days (bought recently, number of visits, days since last visit); overnight tuning on validation only, same effort per model, 3 seeds for the best settings, test used once at the end.
+- docs/PROJECT_LOG.md = the full record (timeline, decisions with why, audit, models, results, tools, AI-use paragraph, 30-second scripts per role). Keep it updated after each round.
 - NEXT:
   1. Teammates accept the GitHub invites (sent 20 Nov, write access: ulapask, gusteruzgaite, jokubasspir-ops, bukauskaiteliepa-glitch).
   2. 02_baselines: random, industry rule, logistic regression on word counts; full data data/raw/visits_10pct.parquet, use the `split` column; pick cut-offs on valid only.
   3. Update scripts/make_explorer_data.py and the Data Explorer page to the new visits (it still calls the removed build_sessions).
+- 21 Nov (night) ROUND 2: 1-in-4 data (2,919,170 visits, 8.7% come back) with history words; scripts/tune.py stage 1 on validation: LR AUC 0.720, RNN 0.728, Transformer 0.732 (PR-AUC 0.191/0.201/0.208). Stage 2 (top 2 × 3 seeds, full train) running overnight. notebooks/05_evaluation.ipynb drafted + reviewed (no leakage), runs after tuning. Details: docs/PROJECT_LOG.md section 12. Non-Kaggle dataset scan: nothing beats REES46 for the main model; Google Merch Store GA4 (BigQuery) = candidate second-shop test; X5 RetailHero = randomised-message uplift side study (unverified details).
+- 21 Nov 06:54 FINAL ROUND 2 (test, 293k visits): AUC random 0.499 / rule 0.562 / LR 0.716 / RNN 0.727 / Transformer 0.729 (PR-AUC 0.213; T−RNN +0.0024, 95% +0.0018..+0.0029). Money: rule wastes €119,729, Transformer@60% €68,785 (−43%), 7,315 left without nudge vs 4,080. Oct→Nov loss 0.004 AUC. Final Transformer: d32, heads 2, 3 blocks, dropout 0.2, lr 0.001, seeds 42-44 averaged (results/tuned/, results/evaluation_*.csv). NEXT: plug model into app predict(); second-shop test (cosmetics or Google Merch GA4); slides.
