@@ -252,6 +252,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .nm-cut { position:absolute; left:0; right:0; height:0; border-top: 1.5px dashed color-mix(in srgb, var(--ink-2) 45%, transparent); }
 .nm-zl { position:absolute; right: 10px; transform: translateY(-50%); font-size: 14px; line-height: 1.2; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .nm-zl.on { font-weight: 800; }
+.nm-zl.thin { background: rgba(255,255,255,.92); padding: 0 5px; border-radius: 4px; }
 .nm-zl.z0.on { color: var(--ink-2); } .nm-zl.z1.on { color: var(--accent); } .nm-zl.z2.on { color: var(--ink); }
 .nm-line { position:absolute; top:0; bottom:0; left:0; right: var(--lab); }
 .nm-svg { position:absolute; inset:0; width:100%; height:100%; overflow: visible; color: var(--ink); }
@@ -442,8 +443,11 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .st-key-owner { margin-top: 40px; border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px 24px 32px; }
 .st-key-owner [data-testid="stSlider"] { max-width: 520px; }
 .ow-title { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--ink); margin: 6px 0 14px 0; line-height: 1.2; }
+.ow-read { font-size: 16px; color: var(--ink); margin: -4px 0 8px 0; } .ow-read b { font-weight: 800; }
 .ow-zones { color: var(--muted); font-size: 14px; margin: -6px 0 0 0; }
 .st-key-owner [data-testid="stSliderThumbValue"], .st-key-owner [data-testid="stSliderTickBar"] { display: none; }
+[data-testid="stSidebar"] [data-testid="stSliderThumbValue"], [data-testid="stSidebar"] [data-testid="stSliderTickBar"] { display: none; }
+.ow-ends.side { max-width: none; margin-top: -10px; }
 .ow-ends { display: flex; justify-content: space-between; max-width: 520px; padding: 0 6px; margin-top: -18px; margin-bottom: 14px; font-size: 14px; font-weight: 600; color: var(--muted); }
 .ow-grid { display: grid; grid-template-columns: 5fr 7fr; gap: 40px; align-items: start; margin-top: 20px; }
 .ow-lab { font-size: 16px; line-height: 1.4; color: var(--ink-2); font-weight: 500; max-width: 420px; }
@@ -481,7 +485,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
   .ow-hero { font-size: 40px; }
   .ow-chart { height: 172px; margin: 10px 8px 26px 50px; }
   .ow-ct { margin-left: 50px; }
-  .ow-pre { display: none; }
+  .ow-short { display: inline !important; } .ow-long { display: none; }
   .ow-cost .n { font-size: 26px; white-space: normal; } .ow-cost .n span { font-size: 15px; }
 }
 .bz-wild { margin-top: 24px; border-top: 1px solid var(--line, #e7e5e1); padding-top: 16px; }
@@ -666,7 +670,7 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
     Shapes are HTML/SVG in % of the plot, colours come from the CSS tokens. Only the newest segment animates."""
     n = len(hist) - 1
     top = max(hist)
-    ymax = 0.3 if top <= 0.3 and high < 0.3 else 0.5 if top <= 0.5 else min(1.0, math.ceil(top * 10) / 10)   # 0.3: keeps the 'no message' zone tall enough for its name
+    ymax = 0.3 if max(top, high) + 0.08 <= 0.3 else 0.5 if top <= 0.5 else min(1.0, math.ceil(top * 10) / 10)   # 0.3: keeps the 'no message' zone tall enough for its name
     dom = max(n, 6)                     # a short visit doesn't stretch across the whole width
 
     def x(i: int) -> float:            # % of the line area
@@ -684,7 +688,7 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
 
     # y axis: 0 / half / top, plus the two cut-off values; a tick too close to a cut-off gives way
     near = 21 / height * 100
-    ticks = [(y(v), f"{pct(v)}%", "") for v in (ymax,) if abs(y(v) - lo) > near and abs(y(v) - hi) > near]   # top of the scale + the two cut-offs
+    ticks = [(y(v), f"{pct(v)}%", "") for v in (ymax,)]   # top of the scale + the two cut-offs
     ticks += [(lo, f"{pct(low)}%", " cut"), (hi, f"{pct(high)}%", " cut")]
     yaxis = "".join(f'<span class="{c.strip()}" style="bottom:{b:.2f}%">{t}</span>' for b, t, c in ticks)
 
@@ -719,7 +723,8 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
     c0 = min(height - lo_px / 2, height - edge)
     c1 = min(height - (lo_px + hi_px) / 2, c0 - gap)
     c2 = max(min((height - hi_px) / 2, c1 - gap), edge)
-    names = "".join(f'<span class="nm-zl z{i}{" on" if i == on else ""}" style="top:{c:.1f}px">{ZONE_NAME[i]}</span>'
+    thin = lo_px < gap                                        # 'no message' zone too small for its name: the name gets a backing
+    names = "".join(f'<span class="nm-zl z{i}{" on" if i == on else ""}{" thin" if (i == 0 and thin) else ""}" style="top:{c:.1f}px">{ZONE_NAME[i]}</span>'
                     for i, c in ((2, c2), (1, c1), (0, c0)))
     label = (f"Chance to come back and buy after each click: " + ", ".join(f"{pct(p)}%" for p in hist)
              + f". Zones: under {pct(low)}% no message, {pct(low)}–{pct(high)}% reminder + {DISCOUNT_RATE:.0%}, "
@@ -764,7 +769,7 @@ def owner_panel(curve: pd.DataFrame, g: float, col: str, ymax: float, ticks: lis
             f'<path class="rule" d="M0,{py(rule):.2f} L100,{py(rule):.2f}"/>'
             f'<path class="here" d="M{px(g):.2f},0 L{px(g):.2f},100"/>'
             f'<path class="nudge" d="M{line}"/></svg>'
-            f'<span class="ow-t rule" style="{rule_y}"><span class="ow-pre">Discount </span>everyone: {fmt(rule)}</span>'
+            f'<span class="ow-t rule" style="{rule_y}">Discount everyone: {fmt(rule)}</span>'
             f'<i class="ow-dot" style="left:{px(g):.2f}%;top:{py(val):.2f}%"></i>'
             f'<span class="ow-t you" style="{x}{y}">Nudge: {fmt(val)}</span>{xs}</div>')
 
@@ -787,9 +792,9 @@ def owner_html(curve: pd.DataFrame, g: float) -> str:
             f'<div class="ow-pills"><span class="ow-pill">{saved}% less wasted</span>'
             f'<span class="ow-pill cost">{more:+d}% left out</span></div>'
             f'<div class="ow-cost"><div class="n">{left:,} <span>vs {rule_left:,} with discount everyone</span></div>'
-            f'<p>Shoppers left without a nudge who did not come back.</p></div>'
+            f'<p><span class="ow-long">Shoppers left without a nudge who did not come back.</span><span class="ow-short" style="display:none">Not nudged, didn&#39;t return.</span></p></div>'
             f'</div><div>{charts}</div></div>'
-            f'<p class="ow-end">At this setting: {saved}% less waste, {extra:,} more shoppers left alone. '
+            f'<p class="ow-end">At this setting: {saved}% less waste, {extra:,} more shoppers got no nudge and did not come back. '
             f'Only an A/B test can say whether that is a loss.</p>'
             f'<p class="ow-foot">Test set: 293k visits from shoppers the model never saw, Oct–Nov 2019, 1 in 4 shoppers of a real store (REES46). '
             f'Money = 10% of what they actually bought when they came back.</p>')
@@ -876,6 +881,7 @@ with st.sidebar:
     # One value, two sliders: this one (presenter) and the one in the owner view on the leave page
     st.session_state.setdefault("gen_side", 50)
     generosity = st.slider("Shop owner: how generous with discounts?", 0, 100, step=5, key="gen_side") / 100
+    st.markdown('<div class="ow-ends side"><span>Stingy</span><span>Generous</span></div>', unsafe_allow_html=True)
     low, high = cutoffs(generosity)
     st.caption(f"Under {low:.0%}: no message · {low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%} · over {high:.0%}: reminder only")
     returning = st.toggle("This customer has visited in the last 14 days", key="h_returning")
@@ -1014,6 +1020,10 @@ if page == "left":
             st.slider("How generous with discounts?", 0, 100, step=5, key="gen_main",
                       on_change=lambda: st.session_state.update(gen_side=st.session_state["gen_main"]))
             st.markdown('<div class="ow-ends"><span>Stingy</span><span>Generous</span></div>', unsafe_allow_html=True)
+            r = curve.loc[round(generosity, 2)]
+            name = "Stingy" if generosity < 0.34 else "Generous" if generosity > 0.66 else "Middle"
+            st.markdown(f'<p class="ow-read"><b>{name}:</b> {round(100 * (1 - r["wasted_eur"] / r["rule_wasted_eur"]))}% less waste · '
+                        f'{round(100 * (r["left_without_nudge"] / r["rule_left_without_nudge"] - 1)):+d}% left out</p>', unsafe_allow_html=True)
             st.markdown(f'<p class="ow-zones">Under {low:.0%}: no message · {low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%} · over {high:.0%}: reminder only</p>'
                         + owner_html(curve, generosity), unsafe_allow_html=True)
     section, gridhtml = inside_html(words, p)

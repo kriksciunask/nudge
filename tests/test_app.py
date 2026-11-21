@@ -193,7 +193,7 @@ def test_owner_view_names_the_cost_too():
     at = fresh()
     next(b for b in at.button if b.label == "Leave the shop").click().run()
     html = owner_html_of(at)
-    assert "less wasted" in html and "% left out" in html and "more shoppers left alone" in html and "A/B test" in html
+    assert "less wasted" in html and "% left out" in html and "more shoppers got no nudge and did not come back" in html and "A/B test" in html
 
 
 if __name__ == "__main__":
