@@ -32,7 +32,8 @@ def test_50_threads_write_counts():
     assert len(rows) == 50 and len({r["sid"] for r in rows}) == 50
     assert len({r["nick"] for r in rows}) == 50                       # auto nicknames are unique
     assert summary(rows)["shoppers"] == 50
-    assert sum(summary(rows)[k] for k in ("none", "discount", "reminder")) == 50
+    sm = summary(rows)
+    assert sm["shopping"] == 50 and sm["left"] == 0 and sum(sm[k] for k in ("none", "discount", "reminder")) == 50
 
 
 def test_idle_expiry():
@@ -78,6 +79,20 @@ def test_nicknames_are_filtered():
     assert clean_nickname("<b>x</b>") == "bxb"          # markup characters are stripped
     assert clean_nickname("F u c k") is None and clean_nickname("sh1t") is None
     assert clean_nickname("") is None and clean_nickname("x") is None
+
+
+def test_summary_separates_shopping_from_left():
+    b = LiveBoard()
+    write(b, "a", zone=1)
+    write(b, "b", zone=2)
+    write(b, "c", zone=1, n_cart=1, cart_value=50.0, status="left")
+    write(b, "d", zone=2, n_cart=2, cart_value=80.0, status="left")
+    write(b, "e", zone=0, status="left")
+    s = summary(b.snapshot())
+    assert (s["shoppers"], s["shopping"], s["left"]) == (5, 2, 3)
+    assert (s["discount"], s["reminder"], s["none"]) == (1, 1, 0)            # the bar counts only those still shopping
+    assert (s["left_discount"], s["left_reminder"], s["left_none"]) == (1, 1, 1)
+    assert (s["left_carts"], s["left_carts_discounted"]) == (2, 1)
 
 
 def test_demo_fill():

@@ -120,13 +120,21 @@ class LiveBoard:
 
 
 def summary(rows: list[dict]) -> dict:
-    """Counts for the hero: shoppers, and what Nudge would do for each (bought shoppers get no message)."""
-    scored = [r for r in rows if r["status"] != "bought"]
-    return {"shoppers": len(rows),
-            "none": sum(r["zone"] == NOTHING_Z for r in scored),
-            "discount": sum(r["zone"] == DISCOUNT_Z for r in scored),
-            "reminder": sum(r["zone"] == REMINDER_Z for r in scored),
-            "bought": len(rows) - len(scored)}
+    """Counts for the board. "none/discount/reminder" = what Nudge would do for those still shopping;
+    "left_*" = final decisions for those who pressed Leave; bought shoppers get no message and are not scored."""
+    shopping = [r for r in rows if r["status"] == "shopping"]
+    left = [r for r in rows if r["status"] == "left"]
+    carts = [r for r in left if r["n_cart"]]
+    return {"shoppers": len(rows), "shopping": len(shopping), "left": len(left),
+            "bought": sum(r["status"] == "bought" for r in rows),
+            "none": sum(r["zone"] == NOTHING_Z for r in shopping),
+            "discount": sum(r["zone"] == DISCOUNT_Z for r in shopping),
+            "reminder": sum(r["zone"] == REMINDER_Z for r in shopping),
+            "left_none": sum(r["zone"] == NOTHING_Z for r in left),
+            "left_discount": sum(r["zone"] == DISCOUNT_Z for r in left),
+            "left_reminder": sum(r["zone"] == REMINDER_Z for r in left),
+            "left_carts": len(carts),                                          # "discount everyone" would discount these
+            "left_carts_discounted": sum(r["zone"] == DISCOUNT_Z for r in carts)}  # what Nudge gave
 
 
 def fill_demo(board: LiveBoard, n: int = 12) -> None:

@@ -433,6 +433,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
   /* The presenter sidebar is for the laptop; on a phone it must never cover the shop (even when the browser restores it open) */
   [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
   div[data-testid="stColumn"]:has(.st-key-cartbox) { order: -1; position: static; max-height: none; overflow: visible; min-width: 0; }
+  .st-key-hdr [data-testid="stHorizontalBlock"] { gap: 10px; }
   .st-key-nudgebox { margin-top: 8px !important; }
   .bz-result { grid-template-columns: 1fr; gap: 16px; }
   .bz-top { grid-template-columns: 1fr; gap: 16px; }
@@ -988,7 +989,7 @@ with st.container(key="hdr"):
 
 if page == "shop" and not st.session_state.clicks:   # first visit by QR: one line of help + optional nickname
     with st.container(key="hint"):
-        st.markdown("<div class='bz-hint'>Shop as usual. The line shows Nudge's guess live.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='bz-hint'>Shop as usual. Nudge guesses if you'd come back and buy: watch your card on the big screen.</div>", unsafe_allow_html=True)
         st.text_input("Nickname (optional)", key="nick_in", max_chars=16, placeholder="Nickname (optional)",
                       label_visibility="collapsed", on_change=set_nick)
 

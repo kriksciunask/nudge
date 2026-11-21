@@ -4,7 +4,7 @@ Shoppers: app.py calls publish() after every click; it writes one small record i
 LiveBoard (nudge/live.py), kept in st.cache_resource so every session in the server sees the same object.
 
 Presenter: open  <app url>/?board=1  on the projector. It refreshes itself every 2 s (st.fragment).
-Add  &key=<board_key>  to get the presenter menu (hide a shopper, reset the board) and  &demo=12  to fill
+Add  &key=<board_key>&menu=1  to get the presenter menu (hide a shopper, reset the board) and  &key=...&demo=12  to fill
 the board with fake shoppers for rehearsal. board_key comes from st.secrets["board_key"] (fallback below).
 """
 
@@ -12,6 +12,7 @@ import hmac
 import html
 import os
 import time
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import streamlit as st
@@ -20,7 +21,7 @@ from nudge.decision import DISCOUNT_RATE
 from nudge.live import LiveBoard, fill_demo, summary
 
 FALLBACK_KEY = "mercato"      # used only when no board_key is set in secrets; set a real one on the cloud
-QR_JS = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+QR_JS = (Path(__file__).resolve().parent / "static" / "qrcode.min.js").read_text()   # vendored qrcodejs 1.0.0 (MIT), no CDN
 JUST_LEFT_SECONDS = 8         # how long a card stays highlighted after Leave
 MAX_CARDS = 24
 ZONE_NAME = ["No message", f"Reminder + {DISCOUNT_RATE:.0%}", "Reminder only"]
@@ -54,9 +55,18 @@ def presenter_ok() -> bool:
     return bool(given) and hmac.compare_digest(given, _secret("board_key", FALLBACK_KEY))
 
 
+def _manual_join_url() -> str:
+    return _secret("join_url") or os.environ.get("NUDGE_JOIN_URL", "")
+
+
+def is_local(url: str) -> bool:
+    host = (urlsplit(url).hostname or "").lower()
+    return host in ("localhost", "::1") or host.startswith("127.") or host == "0.0.0.0"
+
+
 def join_url() -> str:
     """Where phones should go: a secret / env value when set, else this app's own address (no query, no key)."""
-    manual = _secret("join_url") or os.environ.get("NUDGE_JOIN_URL", "")
+    manual = _manual_join_url()
     if manual:
         return manual
     try:
@@ -90,9 +100,9 @@ def _card(r: dict, now: float) -> str:
     if r["status"] == "bought":
         cls, line = "bought", "Bought, no message"
     elif just:
-        cls, line = "left just", f"Just left → {name}"
+        cls, line = "left just" + (" fresh" if now - r["left_at"] < 3 else ""), f"Left → {name}"
     elif r["status"] == "left":
-        cls, line = "left", f"Left · {name}"
+        cls, line = "left", f"Left → {name}"
     else:
         cls, line = "", name
     cart = f'<span class="cart" title="Has a cart">{BAG}€{r["cart_value"]:.0f}</span>' if r["n_cart"] and r["cart_value"] else ""
@@ -108,19 +118,24 @@ def _body(rows: list[dict], now: float) -> str:
                 '<p>Open your phone camera on the code, then shop like you normally would. '
                 'Your card appears here and Nudge\'s guess moves with every click.</p></div>')
     s = summary(rows)
-    segs = "".join(f'<span class="seg z{z}" style="flex:{s[k]}"></span>'
-                   for z, k in ((1, "discount"), (2, "reminder"), (0, "none")))
+    segs = "".join(f'<span class="seg z{z}" style="flex:{s[k]}"></span>' for z, k in ((1, "discount"), (2, "reminder"), (0, "none")))
     cells = "".join(f'<div class="cell z{z}"><b>{s[k]}</b><span>{ZONE_NAME[z]}</span></div>'
                     for z, k in ((1, "discount"), (2, "reminder"), (0, "none")))
     cards = "".join(_card(r, now) for r in rows[:MAX_CARDS])
     more = f'<div class="bd-more">+{len(rows) - MAX_CARDS} more shoppers</div>' if len(rows) > MAX_CARDS else ""
-    n = s["shoppers"]
+    final = ""
+    if s["left"]:
+        parts = " · ".join(f'{s[k]} {ZONE_NAME[z]}' for z, k in ((1, "left_discount"), (2, "left_reminder"), (0, "left_none")) if s[k])
+        final = f'<div class="bd-final">Left already ({s["left"]}), final decisions: <b>{parts}</b></div>'
+    if s["left_carts"]:
+        final += (f'<div class="bd-total">Discounts Nudge gave: <b class="a">{s["left_carts_discounted"]}</b>'
+                  f'<span> vs </span><b>{s["left_carts"]}</b> with discount everyone</div>')
     return (f'<div class="bd-eyebrow"><i></i>Nudge · live audience board</div>'
-            f'<div class="bd-hero"><span class="num">{n}</span><span class="lab">{"shopper" if n == 1 else "shoppers"} '
-            f'in the shop right now</span></div>'
+            f'<div class="bd-hero"><span class="num">{s["shoppers"]}</span><span class="lab">joined · '
+            f'<b>{s["shopping"]}</b> shopping now</span></div>'
             f'<div class="bd-sum"><div class="t">If they left this second, Nudge would send</div>'
             f'<div class="bar" role="img" aria-label="Nudge decisions across the room">{segs}</div>'
-            f'<div class="cells">{cells}</div></div>'
+            f'<div class="cells">{cells}</div>{final}</div>'
             f'<div class="bd-grid">{cards}</div>{more}')
 
 
@@ -129,7 +144,7 @@ def _live() -> None:
     rows = get_store().snapshot()
     now = time.time()
     # the layout changes between the empty state (big QR) and the room view (QR in a side column)
-    cols = "minmax(0,1fr) minmax(0,1fr)" if not rows else "minmax(0,1fr) 340px"
+    cols = "minmax(0,1fr) minmax(0,1fr)" if not rows else "minmax(0,1fr) clamp(340px, 23vw, 460px)"
     st.markdown(f'<style>.st-key-bd {{ grid-template-columns: {cols}; }}</style>', unsafe_allow_html=True)  # (hidden by app.py)
     st.markdown(f'<div class="bd">{_body(rows, now)}</div>', unsafe_allow_html=True)
 
@@ -144,12 +159,12 @@ def _qr_box(url: str) -> None:
         border:1px solid #E6E5E1; border-radius:20px; background:#fff; }}
   #qr {{ line-height:0; }} #qr img, #qr canvas {{ display:block; }}
   .t {{ font-size:26px; font-weight:800; letter-spacing:-.02em; }}
-  .u {{ font-size:19px; font-weight:600; color:#5D636C; word-break:break-all; text-align:center; }}
+  .u {{ font-size:22px; font-weight:600; color:#5D636C; word-break:break-all; text-align:center; }}
 </style>
 <div id="w"><div id="qr"></div><div class="t">Scan to join</div><div class="u">{html.escape(short)}</div></div>
-<script src="{QR_JS}"></script>
+<script>{QR_JS}</script>
 <script>
-  var size = Math.max(160, Math.min(window.innerWidth - 64, window.innerHeight - 200, 540));
+  var size = Math.max(160, Math.min(window.innerWidth - 56, window.innerHeight - 200, 540));
   try {{
     new QRCode(document.getElementById('qr'), {{ text: {url!r}.replace(/'/g, ''), width: size, height: size,
       colorDark: '#14161A', colorLight: '#FFFFFF', correctLevel: QRCode.CorrectLevel.M }});
@@ -168,6 +183,7 @@ CSS = """
 .bd-eyebrow i { width:10px; height:10px; border-radius:50%; background: var(--ok); box-shadow: 0 0 0 4px var(--ok-soft); }
 .bd-hero { display:flex; align-items:baseline; gap:22px; margin: 6px 0 14px; }
 .bd-hero .num { font-size: clamp(84px, 13vh, 136px); font-weight: 800; letter-spacing:-.045em; line-height:1; color: var(--ink); }
+.bd-hero .lab b { font-weight: 800; color: var(--ink); }
 .bd-hero .lab { font-size: clamp(24px, 3.4vh, 34px); font-weight: 600; color: var(--ink-2); letter-spacing:-.01em; }
 .bd-sum { margin-bottom: 22px; }
 .bd-sum .t { font-size: 20px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
@@ -178,7 +194,7 @@ CSS = """
 .cell b { font-size: clamp(38px, 5.2vh, 54px); font-weight: 800; letter-spacing:-.03em; line-height:1; }
 .cell span { font-size: 22px; font-weight: 600; color: var(--muted); }
 .cell.z1 b { color: var(--accent); } .cell.z2 b { color: var(--ink); } .cell.z0 b { color: var(--muted); }
-.bd-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 14px; }
+.bd-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 14px; }
 .bd-card { border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px 12px; background: var(--paper); min-height: 112px;
   display:flex; flex-direction:column; justify-content:space-between; gap:4px; }
 .bd-card .r1 { display:flex; justify-content:space-between; align-items:center; gap:8px; }
@@ -197,16 +213,28 @@ CSS = """
 .bd-card.left { background: var(--soft); border-color: var(--line-2); }
 .bd-card.bought { background: var(--ok-soft); border-color: transparent; } .bd-card.bought .pct, .bd-card.bought .r3 { color: var(--ok); }
 .bd-card.bought .sp polyline { stroke: var(--ok); } .bd-card.bought .sp circle, .bd-card.bought .r3 i { fill: var(--ok); background: var(--ok); }
-.bd-card.just { border-width: 2px; padding: 11px 15px 11px; animation: bd-ring 1.6s ease-out infinite; }
+.bd-card.just { border-width: 2px; padding: 11px 15px 11px; }
+.bd-card.fresh { animation: bd-flash 1s ease-out 1; }
 .bd-card.just.z0 { border-color: var(--muted); } .bd-card.just.z1 { border-color: var(--accent); background: var(--accent-soft); } .bd-card.just.z2 { border-color: var(--ink); }
-@keyframes bd-ring { 0% { box-shadow: 0 0 0 0 rgba(201,58,37,.35); } 100% { box-shadow: 0 0 0 14px rgba(201,58,37,0); } }
+@keyframes bd-flash { 0% { box-shadow: 0 0 0 0 rgba(20,22,26,.28); } 100% { box-shadow: 0 0 0 16px rgba(20,22,26,0); } }
+.bd-final { margin-top: 18px; font-size: 22px; color: var(--ink-2); } .bd-final b { font-weight: 700; color: var(--ink); }
+.bd-total { margin-top: 8px; font-size: 26px; font-weight: 600; color: var(--ink-2); } .bd-total b { font-weight: 800; color: var(--ink); } .bd-total b.a { color: var(--accent); }
+.bd-warn { margin: 0 0 14px; padding: 14px 16px; border-radius: 14px; background: #FBEDEA; border: 1.5px solid var(--accent); color: #8E2616; font-size: 20px; font-weight: 700; line-height: 1.35; }
 .bd-more { margin-top: 14px; font-size: 20px; font-weight: 600; color: var(--muted); }
 .bd-empty { padding-top: 14vh; max-width: 760px; }
 .bd-empty .big { font-size: clamp(72px, 12vh, 128px); font-weight: 800; letter-spacing:-.045em; line-height:1; }
 .bd-empty p { margin-top: 22px; font-size: 26px; line-height: 1.45; color: var(--ink-2); }
 .st-key-bd_ctl { margin-top: 18px; }
 .st-key-bd_ctl button { min-height: 36px; font-size: 16px; }
-@media (prefers-reduced-motion: reduce) { .bd-card.just { animation: none; } }
+@media (max-height: 960px) {
+  .block-container { padding-top: 18px !important; }
+  .bd-hero { margin: 2px 0 8px; } .bd-hero .num { font-size: 84px; }
+  .bd-sum { margin-bottom: 14px; } .bd-sum .t { margin-bottom: 8px; } .bd-sum .cells { margin-top: 8px; }
+  .cell b { font-size: 36px; } .bd-final { margin-top: 10px; font-size: 20px; } .bd-total { margin-top: 4px; font-size: 22px; }
+  .bd-grid { gap: 10px; } .bd-card { min-height: 92px; padding: 8px 14px; } .bd-card.just { padding: 7px 13px; }
+  .bd-card .pct { font-size: 32px; }
+}
+@media (prefers-reduced-motion: reduce) { .bd-card.fresh { animation: none; } }
 @media (max-width: 1100px) { .st-key-bd { grid-template-columns: minmax(0,1fr) !important; } .st-key-bd > *:nth-child(n) { grid-column: 1; } }
 </style>
 """
@@ -217,12 +245,13 @@ def render() -> None:
     st.markdown(CSS, unsafe_allow_html=True)
     ok = presenter_ok()
     store = get_store()
+    menu = ok and str(st.query_params.get("menu", "")) == "1"      # the menu stays off the projector unless asked for
     if ok and str(st.query_params.get("demo", "")).isdigit() and not any(r["demo"] for r in store.snapshot(True)):
         fill_demo(store, min(int(st.query_params["demo"]), 40))
     with st.container(key="bd"):
         with st.container(key="bd_main"):
             _live()
-            if ok:
+            if menu:
                 with st.container(key="bd_ctl"):
                     with st.popover("Presenter", icon=":material/tune:"):
                         who = st.text_input("Hide a shopper (their nickname)", key="bd_hide_in")
@@ -232,4 +261,8 @@ def render() -> None:
                             store.reset()
                             st.toast("Board cleared")
         with st.container(key="bd_side"):
-            _qr_box(join_url())
+            url = join_url()
+            if is_local(url) and not _manual_join_url():
+                st.markdown('<div class="bd-warn">Phones can\'t reach localhost: set join_url (secrets or NUDGE_JOIN_URL) '
+                            'to this computer\'s address or the hosted app.</div>', unsafe_allow_html=True)
+            _qr_box(url)

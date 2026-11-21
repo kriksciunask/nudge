@@ -215,11 +215,12 @@ def board_app(key="k", **params) -> AppTest:
 def test_board_shows_fake_shoppers_and_hero():
     import live_board
     live_board.get_store().reset()
-    at = board_app(demo="12")
+    at = board_app(demo="12", menu="1")
     assert not at.exception, at.exception
     html = board_html(at)
     assert '<span class="num">12</span>' in html and html.count('class="bd-card') == 12
-    assert "Just left" in html and "Left ·" in html and "Reminder + 10%" in html
+    assert "9</b> shopping" in html or "shopping now" in html
+    assert "Left → " in html and "Discounts Nudge gave" in html and "Reminder + 10%" in html
     assert any(b.key == "bd_reset" for b in at.button)       # presenter menu only with the key
 
 
@@ -230,7 +231,10 @@ def test_board_without_key_has_no_menu_and_no_backdoor():
     assert not at.exception, at.exception
     assert "Scan to join" in board_html(at) and 'class="bd-card' not in board_html(at)
     assert not any(b.key == "bd_reset" for b in at.button)
-    at = board_app(key="wrong", demo="12")
+    at = board_app(demo="12")                                              # key but no menu=1: nothing on the projector
+    assert not any(b.key == "bd_reset" for b in at.button) and 'class="bd-card' in board_html(at)
+    live_board.get_store().reset()
+    at = board_app(key="wrong", demo="12", menu="1")
     assert 'class="bd-card' not in board_html(at)
 
 
