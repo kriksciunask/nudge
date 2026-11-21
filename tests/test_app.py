@@ -101,6 +101,40 @@ def test_leave_page_uses_same_words_and_chart():
     assert "placeholder" not in " ".join(m.value.lower() for m in at.markdown if "<style>" not in m.value)
 
 
+def leave_markdown(at) -> str:
+    return " ".join(m.value for m in at.markdown if "<style>" not in m.value)
+
+
+def test_leave_page_look_inside():
+    at = fresh()
+    next(b for b in at.button if b.key and b.key.startswith("gv_")).click().run()
+    at.button(key="detail_cart").click().run()
+    next(b for b in at.button if b.label == "Leave the shop").click().run()
+    assert not at.exception, at.exception
+    text = leave_markdown(at)
+    assert "Look inside the model" in text and text.count("Looked at most") == 1
+    rows = re.findall(r'class="bz-in-row[^"]*"', text)
+    assert len(rows) == len(words_on_leave(at))                       # one row per word the model read
+    widths = [float(x) for x in re.findall(r'class="fill" style="width:([\d.]+)%', text)]
+    assert max(widths) == 100.0 and "softmax(QK" in text and "chance if removed" in text
+    assert any("Full attention grid" in e.label for e in at.expander)
+
+
+def words_on_leave(at) -> list[str]:
+    return re.findall(r'class="bz-chip[^"]*" title="([^"]+)"', next(m.value for m in at.markdown if 'class="bz-seen"' in m.value))
+
+
+def test_look_inside_long_visit_is_capped():
+    at = fresh()
+    for _ in range(16):                                     # 16 views = 17 words with the start word
+        next(b for b in at.button if b.key and b.key.startswith("gv_")).click().run()
+        next(b for b in at.button if b.label.startswith("Back to all")).click().run()
+    next(b for b in at.button if b.label == "Leave the shop").click().run()
+    assert not at.exception, at.exception
+    text = leave_markdown(at)
+    assert len(re.findall(r'class="bz-in-row', text)) == 16 and "1 earlier word not shown" in text
+
+
 if __name__ == "__main__":
     tests = [f for name, f in sorted(globals().items()) if name.startswith("test_")]
     for t in tests:

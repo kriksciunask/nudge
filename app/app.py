@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
 from nudge.contract import START_WORDS, predict, session_words  # noqa: E402
 START_WORDS_SET = set(START_WORDS)
+from nudge.explain import attention_matrix, attention_to_summary, kept, without_each  # noqa: E402
 from nudge.decision import DISCOUNT, DISCOUNT_RATE, NOTHING, REMINDER, cutoffs, decide  # noqa: E402
 
 SHOP = "Mercato"
@@ -347,6 +348,63 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-thanks h1 { font-size: 34px; font-weight: 800; letter-spacing: -.03em; margin: 0 0 8px 0; padding:0; }
 .bz-thanks p { color: var(--muted); font-size: 16px; line-height: 1.6; }
 
+
+/* --- Look inside the model (leave page) ------------------------------------------------------- */
+.bz-inside { margin-top: 40px; border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px 24px 32px; }
+.bz-in-title { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--ink); margin: 6px 0 4px 0; line-height: 1.2; }
+.bz-in-sub { color: var(--muted); font-size: 16px; line-height: 1.5; margin: 0 0 20px 0; max-width: 760px; }
+.bz-in-head, .bz-in-row { display: grid; grid-template-columns: 28px minmax(220px, 1.15fr) minmax(0, 1.5fr) 170px; gap: 8px 20px; align-items: center; }
+.bz-in-head { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding-bottom: 10px;
+  border-bottom: 1px solid var(--line); }
+.bz-in-head .dl, .bz-in-row .dl { text-align: right; }
+.bz-in-row { padding: 9px 0; border-bottom: 1px solid var(--soft-2); }
+.bz-in-row:last-of-type { border-bottom: none; }
+.bz-in-row .n { font-size: 14px; font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; }
+.bz-in-row .w { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; }
+.bz-in-row .w .bz-chip { font-size: 14px; padding: 5px 10px; }
+.bz-tag { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+  white-space: nowrap; }
+.bz-tag.look { background: var(--accent-soft); color: #9C2C1B; }
+.bz-tag.move { background: var(--ink); color: #fff; }
+.bz-in-row .bar { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.bz-in-row .track { flex: 1; height: 14px; border-radius: 7px; background: var(--soft); overflow: hidden; }
+.bz-in-row .fill { height: 100%; border-radius: 7px; background: #A9AEB5; min-width: 3px; transform-origin: left; animation: bz-grow .6s cubic-bezier(.2,.7,.2,1) both; }
+.bz-in-row.top .fill { background: var(--accent); }
+.bz-in-row .val { width: 44px; text-align: right; font-size: 16px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.bz-in-row .dl { text-align: right; font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bz-in-row .dl.none { color: var(--muted); font-weight: 500; }
+.bz-in-row .dl.na { color: var(--line-2); font-weight: 500; }
+.bz-in-row .dl small { display: none; text-transform: none; font-weight: 500; color: var(--muted); font-size: 13px; }
+@keyframes bz-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .bz-in-row .fill { animation: none; } }
+.bz-in-note { margin: 0; padding-top: 18px; color: var(--ink-2); font-size: 15px; line-height: 1.55; max-width: 820px; }
+.bz-in-course { margin: 6px 0 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.bz-in-course code, .bz-in-legend { display: none; color: var(--muted); font-size: 14px; line-height: 1.5; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.bz-in-more { font-family: var(--mono) !important; }
+.bz-in-more { color: var(--muted); font-size: 13px; padding: 8px 0 0 0; }
+.bz-grid-wrap { overflow-x: auto; padding-bottom: 4px; }
+.bz-grid { border-collapse: separate; border-spacing: 3px; font-variant-numeric: tabular-nums; }
+.bz-grid th, .bz-grid td { border: none !important; }
+.bz-grid th { font-size: 14px; font-weight: 600; color: var(--ink-2); text-align: left; white-space: nowrap; padding: 0 12px 0 0; }
+.bz-grid th.c { text-align: center; padding: 0; color: var(--muted); font-weight: 700; }
+.bz-grid th .n { display: inline-block; width: 22px; color: var(--faint); font-weight: 600; }
+.bz-grid td { width: 40px; height: 36px; min-width: 40px; text-align: center; font-size: 13px; font-weight: 600; border-radius: 6px; background: var(--soft); color: var(--ink); }
+.bz-grid tr.used th { color: var(--accent); }
+.bz-grid tr.used td { box-shadow: 0 0 0 1.5px var(--ink); }
+.bz-grid-cap { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 12px 0 0 0; }
+.st-key-gridbox { margin-top: 12px; }
+.st-key-gridbox [data-testid="stExpander"] { border: 1px solid var(--line); border-radius: 14px; }
+.st-key-gridbox summary { font-size: 16px; font-weight: 600; padding: 14px 18px; }
+@media (max-width: 640px) {
+  .bz-inside { padding: 20px 16px 18px 16px; margin-top: 24px; border-radius: 16px; }
+  .bz-in-title { font-size: 22px; }
+  .bz-grid .lab { display: none; } .bz-grid td { width: 30px; min-width: 30px; height: 32px; font-size: 12px; } .bz-grid th .n { width: 18px; }
+  .bz-in-head { display: none; }
+  .bz-in-row { grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: "n w w" ". bar dl"; gap: 8px 12px; padding: 10px 0; }
+  .bz-in-row .n { grid-area: n; } .bz-in-row .w { grid-area: w; } .bz-in-row .bar { grid-area: bar; } .bz-in-row .dl { grid-area: dl; }
+  .bz-in-row .dl { text-align: right; min-width: 92px; } .bz-in-row .dl.na { visibility: hidden; } .bz-in-legend { display: block; }
+}
+
 /* Narrow laptops: keep everything inside the screen */
 @media (max-width: 1360px) {
   .block-container { padding: 0 24px 48px 24px !important; }
@@ -414,6 +472,11 @@ def word_label(word: str) -> str:
     return " · ".join(WORD_PARTS.get(part, part) for part in word.split("_"))
 
 
+def chip(w: str, ctx: bool = False) -> str:
+    return (f'<span class="bz-chip{" cart" if w.startswith("cart") else ""}{" ctx" if ctx else ""}" title="{esc(w)}">'
+            f'{esc(word_label(w))}</span>')
+
+
 def chips(words: list[str], last: int | None = None, count_earlier: bool = True) -> str:
     """Words as chips (raw model word in the tooltip). With `last`, only the latest ones plus a count of earlier ones."""
     shown = list(enumerate(words))
@@ -459,6 +522,71 @@ def chance(words: tuple[str, ...]) -> float:
 
 def pct(p: float) -> int:
     return round(p * 100)
+
+
+# --- Look inside the model: attention (where it looked) and leave-one-out (what changes the answer) ------
+@st.cache_data(max_entries=500, show_spinner=False)
+def look_inside(words: tuple[str, ...]):
+    """(attention to the summary position per word, change in points without each click, word x word grid)."""
+    w = list(words)
+    return attention_to_summary(w), without_each(w), attention_matrix(w).tolist()
+
+
+MAX_ROWS, MAX_GRID = 16, 12
+
+
+def inside_html(words: list[str]) -> tuple[str, str]:
+    """The "Look inside" section (rows) and the full attention grid, both as HTML."""
+    words = kept(words)
+    att, delta, grid = look_inside(tuple(words))
+    top = max(range(len(att)), key=att.__getitem__)
+    moves = [i for i, d in enumerate(delta) if d is not None and abs(d) >= 1]
+    biggest = max(moves, key=lambda i: abs(delta[i])) if moves else None
+    scale = max(att)
+    order = list(range(len(words))) if len(words) <= MAX_ROWS else [0] + list(range(len(words) - (MAX_ROWS - 1), len(words)))
+    rows = ""
+    for i in order:
+        d = delta[i]
+        if d is None:
+            cell = '<div class="dl na">—</div>'
+        elif abs(d) < 1:
+            cell = '<div class="dl none">≈ no change</div>'
+        else:
+            cell = (f'<div class="dl">{"▲ +" if d > 0 else "▼ −"}{abs(round(d))} pts</div>')
+        tags = ('<span class="bz-tag look">Looked at most</span>' if i == top else "") + \
+               ('<span class="bz-tag move">Biggest effect</span>' if i == biggest else "")
+        rows += (f'<div class="bz-in-row{" top" if i == top else ""}"><div class="n">{i + 1}</div>'
+                 f'<div class="w">{chip(words[i], ctx=i == 0 or words[i] in WORD_FULL)}{tags}</div>'
+                 f'<div class="bar"><div class="track"><div class="fill" style="width:{att[i] / scale * 100:.1f}%"></div></div>'
+                 f'<div class="val">{round(att[i] * 100)}%</div></div>{cell}</div>')
+    hidden = len(words) - len(order)
+    more = f'<div class="bz-in-more">{hidden} earlier word{"" if hidden == 1 else "s"} not shown (the model read them all).</div>' if hidden else ""
+    head = ('<div class="bz-in-head"><div></div><div>Word, in order</div><div>How much the summary looked at it</div>'
+            '<div class="dl">Chance if removed</div></div>')
+    # full grid: last MAX_GRID words; rows = who is looking, columns = looked at
+    g0 = max(0, len(words) - MAX_GRID)
+    gw = words[g0:]
+    cols = "".join(f'<th class="c">{g0 + j + 1}</th>' for j in range(len(gw)))
+    body = ""
+    for a, w in enumerate(gw):
+        cells = "".join(
+            (lambda v: f'<td style="background:rgba(201,58,37,{min(1, v / 0.5) * .9 + .04:.2f});color:{"#fff" if v > .32 else "var(--ink)"}">'
+                       f'{round(v * 100) if v >= .1 else ""}</td>')(grid[g0 + a][g0 + b]) for b in range(len(gw)))
+        body += (f'<tr{" class=used" if g0 + a == 0 else ""}><th scope="row"><span class="n">{g0 + a + 1}</span><span class="lab">{esc(word_label(w))}</span></th>{cells}</tr>')
+    cut = (f'<p class="bz-grid-cap">Showing the last {len(gw)} words ({len(words) - len(gw)} earlier not shown).</p>' if g0 else "")
+    gridhtml = (f'<div class="bz-grid-wrap"><table class="bz-grid"><thead><tr><th></th>{cols}</tr></thead><tbody>{body}</tbody></table></div>'
+                f'<p class="bz-grid-cap">Each row shows where that word looks (the row adds to 100%). Darker = more attention. '
+                f'Only row 1, the summary word, feeds the answer. Numbers match the rows above.</p>{cut}')
+    if g0:   # row 1 is cut off: say so rather than outline a row that is not there
+        gridhtml = gridhtml.replace(" class=used", "")
+    section = (f'<div class="bz-inside"><div class="bz-eyebrow" style="margin-top:0">Look inside the model</div>'
+               f'<div class="bz-in-title">Where the model looked in this visit</div>'
+               f'<p class="bz-in-sub">Nudge reads the visit word by word and sums it up in its first word. The bars show how much it looked at each word.</p>'
+               f'{head}<div class="bz-in-legend">Bar: how much the summary looked at the word. Right: chance if that click were removed.</div>{rows}{more}'
+               f'<p class="bz-in-note">Attention shows where the model looked. The "chance if removed" column shows what actually changes the answer.</p>'
+               f'<p class="bz-in-course">Attention = softmax(QK<sup>T</sup>/√d)·V, last of 3 blocks, averaged over 2 heads and 3 seeds. Summary = first position, like &lt;cls&gt;.</p>'
+               f'</div>')
+    return section, gridhtml
 
 
 def chance_chart(hist: list[float], low: float, high: float, height: int = 168, big: bool = False,
@@ -741,6 +869,11 @@ if page == "left":
         f'</div><div class="bz-phonecol"><div class="bz-phone"><div class="bz-phone-top"><div class="bz-ava">m</div><div><b>{SHOP}</b>'
         f'<small>Message preview · WhatsApp-style</small></div></div><div class="bz-chat">{chat}</div></div>'
         f'</div></div>', unsafe_allow_html=True)
+    section, gridhtml = inside_html(words)
+    st.markdown(section, unsafe_allow_html=True)
+    with st.container(key="gridbox"):
+        with st.expander("Full attention grid (word × word)"):
+            st.markdown(gridhtml, unsafe_allow_html=True)
     st.stop()
 
 main, side = st.columns([2.6, 1], gap="large")
