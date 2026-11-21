@@ -1,0 +1,16 @@
+rule,discounts,wasted_eur,left_without_nudge
+4+ clicks AND cart value <= €458,10788,49772.73,8932
+cart value > €37 AND cart value <= €458,11411,54500.67,8437
+4+ clicks AND cart value > €37 AND cart value <= €946,11377,65901.95,8496
+4+ clicks AND cart value <= €946,12656,69842.76,7410
+returning visitor AND cart value <= €946,10872,71048.31,9181
+1+ visit in last 14 d AND cart value <= €946,10872,71048.31,9181
+returning visitor AND 1+ visit in last 14 d AND cart value <= €946,10872,71048.31,9181
+cart value > €89 AND cart value <= €946,11331,73570.37,8569
+cart value > €37 AND cart value <= €946,13655,79583.56,6600
+4+ clicks AND cart value > €89,10606,90204.33,9241
+returning visitor AND cart value > €37,10818,93352.53,9279
+1+ visit in last 14 d AND cart value > €37,10818,93352.53,9279
+returning visitor AND 1+ visit in last 14 d AND cart value > €37,10818,93352.53,9279
+4+ clicks AND cart value > €37,12564,94895.88,7576
+returning visitor AND 1+ visit in last 14 d,11826,96358.65,8449

@@ -391,3 +391,22 @@ Paired shopper bootstrap (200 draws): Transformer minus rule AUC **+0.125** (+0.
 At the middle setting Nudge saves 29% of the wasted discount (electronics: -43% at the reported 60% policy; not like for like). The saving is real but the price is more cart abandoners skipped (15,325 vs 8,951). Cosmetics scores sit lower than electronics, so the same cut-offs discount fewer shoppers than the slider label suggests: g=0.5 discounts 50% of cart abandoners, and the generous end is needed to get close to the rule. A shop owner would set the slider on their own data. Euro amounts are small because cosmetics are cheap; compare percentages.
 
 **Caveats to say openly:** (1) this is a second Kaggle shop from the same company (REES46), same click format, same months, not an independent platform. (2) One month-window shift and no new training, so it tests the model, not the recipe. (3) The money cut-offs are not re-tuned per shop, a shop owner would set the slider on their own data. (4) The same limitation as everywhere: this predicts who comes back, not that a discount causes it.
+
+## 14. Nudge vs smart workflows — 22 Nov
+
+**Question:** the industry rule is a weak opponent. What if the shop is smarter: wait before discounting (escalation), or writes a segment rule? Notebook `notebooks/07_smart_workflows.ipynb`, results `results/smart_workflows.csv` and `smart_workflows_segment_search.csv`. Everything chosen on validation (Nudge cut-off = 60th percentile of validation cart abandoners' scores, the segment rule searched on validation), reported on the 22,384 test cart abandoners (21.8% come back). Transformer score = average of the 3 seeds `transformer_4eb04ce3`, rows checked against `stage2.csv`. One discount per shopper per week, 10% off, 200-draw shopper bootstrap.
+
+**Escalation** = reminder at the decision moment, the 10% only to those who have not bought after D hours. The visits data holds the real time of the next purchase (`days_to_buy`), so no assumption: 41.9% of come-backs happen within 24 h and 66.9% within 48 h.
+
+| Policy (test) | discounts | wasted € (95%) | vs rule | € per discount | left without nudge |
+| --- | --- | --- | --- | --- | --- |
+| Industry rule (everyone gets 10%) | 16,467 | 119,729 (110,338–128,152) | 0 | 7.27 | 4,080 |
+| Escalation, 10% after 24 h if not bought | 15,443 | 72,523 (66,600–78,648) | -39% | 4.70 | 3,967 |
+| Escalation, 10% after 48 h if not bought | 14,763 | 42,317 (38,477–47,772) | -65% | 2.87 | 3,890 |
+| Nudge@60% | 11,987 | 68,785 (63,208–73,912) | -43% | 5.74 | 7,315 |
+| Nudge@60% + escalation 24 h | 11,313 | 41,139 (37,321–44,864) | -66% | 3.64 | 7,301 |
+| Segment rule: 4+ clicks AND cart value <= €458 | 10,719 | 51,584 (48,214–55,106) | -57% | 4.81 | 8,838 |
+
+**Honest reading: Nudge alone does NOT beat a smart workflow on € wasted.** Escalation at 24 h is about equal to Nudge@60% (ranges overlap) while sending more discounts; escalation at 48 h wastes clearly less (-65% vs -43%). A cart-value segment rule (found on validation, about Nudge's discount count) also wastes less (-57%), though it skips more non-returners (8,838 vs 7,315). The reason is partly mechanical: waiting lets the shop see who buys anyway, and the 10% is worth 10% of the order, so skipping big carts saves euros regardless of intent. What Nudge adds: it decides at the decision moment with no waiting, and it **combines** with escalation: Nudge + 24 h wastes -66%, as little as escalation at 48 h, with fewer discounts (11,313 vs 14,763) and a 24 h instead of 48 h delay.
+
+**Catches:** (1) a late discount reaches people later, and our data has no messages, so it cannot say whether the delay loses sales (only an A/B test can). (2) Escalation discounts every non-returner by design (that is the margin-to-browsers problem); its "left without nudge" is only the people removed by one-per-week, who still got the reminder. (3) The one-per-week rule uses the decision time for escalation, a small simplification. (4) Prediction is not causation, as everywhere. Pitch line: "Nudge is not a replacement for a smart flow, it is the decision layer you put in front of it."
