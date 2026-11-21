@@ -8,14 +8,17 @@ on their own within 7 days, and the decision layer (nudge/decision.py) picks:
 no message / reminder only / reminder + 10%.
 
 Screenshot shortcuts (only read when a new visitor opens the page):
+  ?views=p047,p014  start having viewed these products (25 s apart)
   ?cart=p024,p023   start with these products in the cart
   ?view=p024        start on that product page
+  ?visits=5&last=0.5&bought=1   start as a returning shopper with this history
   ?page=left        start on the "shopper left" result page
 """
 
 import base64
 import html
 import io
+import math
 import sys
 import time
 from pathlib import Path
@@ -25,7 +28,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
-from nudge.contract import IS_PLACEHOLDER, predict, session_words  # noqa: E402
+from nudge.contract import predict, session_words  # noqa: E402
 from nudge.decision import DISCOUNT, DISCOUNT_RATE, NOTHING, REMINDER, cutoffs, decide  # noqa: E402
 
 SHOP = "Mercato"
@@ -191,7 +194,8 @@ div[class*="st-key-gv_"] button, div[class*="st-key-sv_"] button { background: t
 .bz-perks svg { flex:none; color: var(--ink); }
 
 /* --- Side column: cart + what Nudge sees -------------------------------------------------- */
-div[data-testid="stColumn"]:has(.st-key-cartbox) { position: sticky; top: 16px; align-self: flex-start; min-width: 300px; }
+div[data-testid="stColumn"]:has(.st-key-cartbox) { position: sticky; top: 16px; align-self: flex-start; min-width: 280px;
+  max-height: calc(100vh - 32px); overflow-y: auto; scrollbar-width: thin; }
 .st-key-cartbox { border: 1px solid var(--line); border-radius: 16px; padding: 20px; gap: 12px; background:#fff; }
 .bz-panel-title { font-weight: 800; color: var(--ink); font-size: 17px; letter-spacing:-.01em; display:flex; justify-content:space-between; align-items:baseline; }
 .bz-panel-title span { color: var(--muted); font-size: 13px; font-weight: 500; }
@@ -208,7 +212,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-total { display:flex; justify-content:space-between; align-items:baseline; border-top: 1px solid var(--line); padding-top: 12px; margin: 4px 0 8px 0; }
 .bz-total span { color: var(--muted); font-size: 14px; }
 .bz-total b { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.st-key-nudgebox { background: var(--soft); border-radius: 16px; padding: 20px 20px 16px 20px; gap: 8px; margin-top: 8px; }
+.st-key-nudgebox { background: var(--soft); border-radius: 16px; padding: 20px 20px 16px 20px; gap: 8px; }
 .bz-nudge-title { display:flex; align-items:center; gap:8px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing:.1em; color: var(--muted); }
 .bz-nudge-title i { width:8px; height:8px; border-radius:50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(30,107,79,.15); }
 .bz-chips { display:flex; flex-wrap:wrap; gap:6px; }
@@ -219,6 +223,61 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-chip.start { background: var(--ink); color:#fff; border-color: var(--ink); }
 .bz-more { color: var(--muted); font-size: 13px; }
 .bz-nudge-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 8px 0; }
+.bz-chip.hist { background: var(--soft-2); border-color: var(--soft-2); color: var(--ink-2); }
+
+/* --- Live meter: the chance after every click (every part has a fixed height, so nothing jumps) --- */
+.nm-label { font-size: 14px; font-weight: 600; color: var(--ink-2); margin-top: 10px; }
+.nm-hero-row { display:flex; align-items:baseline; gap: 12px; height: 50px; }
+.nm-hero { font-size: 48px; font-weight: 800; line-height: 1; letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.nm-hero sup { font-size: .42em; vertical-align: top; position: relative; top: .2em; margin-left: 3px; letter-spacing: 0; color: var(--muted); }
+.nm-delta { font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0; animation: nm-fade .4s ease-out both; }
+.nm-sub { font-size: 13px; line-height: 1.45; color: var(--muted); height: 2.9em; }
+.nm-chart { display:grid; grid-template-columns: minmax(0,1fr) 92px; grid-template-rows: var(--h) 18px; column-gap: 10px; margin-top: 14px; }
+.nm-chart.big { grid-template-columns: minmax(0,1fr) 128px; column-gap: 14px; }
+.nm-plot { position: relative; }
+.nm-zones { position:absolute; inset:0; border-radius: 8px; overflow:hidden; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); }
+.nm-zone { position:absolute; left:0; right:0; transition: background-color .2s ease; }
+.nm-zone.z0 { background: color-mix(in srgb, var(--faint) 10%, var(--paper)); }
+.nm-zone.z1 { background: color-mix(in srgb, var(--accent) 8%, var(--paper)); border-top: 1px solid color-mix(in srgb, var(--accent) 22%, var(--paper)); }
+.nm-zone.z2 { background: color-mix(in srgb, var(--ink-2) 3%, var(--paper)); border-bottom: 1px solid var(--line); }
+.nm-zone.z0.on { background: color-mix(in srgb, var(--faint) 22%, var(--paper)); }
+.nm-zone.z1.on { background: color-mix(in srgb, var(--accent) 16%, var(--paper)); }
+.nm-zone.z2.on { background: color-mix(in srgb, var(--ink-2) 9%, var(--paper)); }
+.nm-ymax { position:absolute; top: 4px; left: 6px; font-size: 10.5px; font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; }
+.nm-svg { position:absolute; inset:0; width:100%; height:100%; overflow: visible; color: var(--ink); }
+.nm-svg path { fill:none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.nm-new { animation: nm-draw .45s cubic-bezier(.2,.7,.2,1) both; }
+.nm-dot { position:absolute; width:6px; height:6px; margin: 0 0 -3px -3px; border-radius:50%; background: var(--ink); }
+.nm-dot.now { width:12px; height:12px; margin: 0 0 -6px -6px; box-shadow: 0 0 0 3px var(--paper); animation: nm-pop .35s .25s cubic-bezier(.2,.7,.2,1.3) both; }
+.nm-dot.now.z0 { background: var(--muted); } .nm-dot.now.z1 { background: var(--accent); } .nm-dot.now.z2 { background: var(--ink); }
+.nm-hint { position:absolute; left: 14%; right: 5%; top: 50%; transform: translateY(-50%); font-size: 12.5px; line-height: 1.4; color: var(--ink-2);
+  background: var(--paper); padding: 6px 9px; border-radius: 6px; box-shadow: 0 0 0 1px var(--line), 0 2px 6px -2px rgba(20,22,26,.12); }
+.nm-gutter { position: relative; }
+.nm-zl { position:absolute; left:0; right:0; transform: translateY(-50%); font-size: 11.5px; line-height: 1.2; font-weight: 600; color: var(--faint); white-space: nowrap; }
+.nm-zl.on { font-weight: 700; }
+.nm-zl.z0.on { color: var(--ink-2); } .nm-zl.z1.on { color: var(--accent); } .nm-zl.z2.on { color: var(--ink); }
+.nm-x { grid-column: 1; display:flex; justify-content:space-between; align-items:flex-end; font-size: 11px; color: var(--faint); padding: 0 2px; }
+.nm-chart.big .nm-zl { font-size: 14px; }
+.nm-chart.big .nm-ymax, .nm-chart.big .nm-x { font-size: 12.5px; }
+.nm-chart.big .nm-dot { width:8px; height:8px; margin: 0 0 -4px -4px; }
+.nm-chart.big .nm-dot.now { width:16px; height:16px; margin: 0 0 -8px -8px; }
+.nm-chart.big .nm-svg path { stroke-width: 2.5; }
+.nm-act { display:flex; align-items:center; gap: 8px; margin-top: 10px; font-size: 14.5px; font-weight: 700; height: 20px; white-space: nowrap; }
+.nm-act i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.nm-act.z0 { color: var(--ink-2); } .nm-act.z0 i { background: var(--muted); }
+.nm-act.z1 { color: var(--accent); } .nm-act.z1 i { background: var(--accent); }
+.nm-act.z2 { color: var(--ink); } .nm-act.z2 i { background: var(--ink); }
+.nm-words { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+.nm-words-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px; }
+.nm-words-head b { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.nm-words-head span { font-size: 12px; color: var(--muted); }
+.st-key-nudgebox .nm-words .bz-chips { height: 155px; flex-wrap: nowrap; overflow: hidden; margin: 0; gap: 5px; }
+.st-key-nudgebox .bz-chip { font-size: 12.5px; padding: 4px 9px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+@keyframes nm-draw { from { clip-path: var(--clip-from); } to { clip-path: inset(0 0 0 0); } }
+@keyframes nm-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes nm-fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nm-new, .nm-dot.now, .nm-delta { animation: none; } .nm-zone { transition: none; } }
 
 /* --- Result page ("the shopper left") ----------------------------------------------------- */
 .bz-eyebrow { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing:.12em; color: var(--muted); margin-top: 16px; }
@@ -230,21 +289,8 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-hero { font-size: 104px; font-weight: 800; color: var(--ink); line-height: .95; letter-spacing: -.06em; font-variant-numeric: tabular-nums;
   margin: 4px 0 8px -4px; }
 .bz-hero sup { font-size: .42em; vertical-align: top; position: relative; top: .18em; margin-left: 4px; letter-spacing:0; color: var(--muted); }
-.bz-scale { position:relative; height: 12px; display:flex; gap: 2px; margin-top: 32px; }
-.bz-scale .z { height:100%; opacity: .3; }
-.bz-scale .z.on { opacity: 1; }
-.bz-scale .z0 { background: #8A9099; border-radius: 6px 0 0 6px; }
-.bz-scale .z1 { background: var(--accent); }
-.bz-scale .z2 { background: var(--ink-2); border-radius: 0 6px 6px 0; }
-.bz-scale .pin { position:absolute; top:-6px; width: 4px; height: 24px; background: var(--ink); border-radius: 2px; transform: translateX(-2px);
-  box-shadow: 0 0 0 2px #fff; }
-.bz-scale .pin span { position:absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--ink); color:#fff;
-  font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
-.bz-legend { display:flex; gap: 8px 24px; flex-wrap: wrap; margin-top: 14px; font-size: 15px; color: var(--muted); }
-.bz-legend span { display:inline-flex; align-items:center; gap:8px; }
-.bz-legend i { width:12px; height:12px; border-radius:3px; display:inline-block; opacity: .3; }
-.bz-legend .on { color: var(--ink); font-weight: 700; }
-.bz-legend .on i { opacity: 1; }
+.bz-story { margin-top: 20px; }
+.bz-story small { display:block; font-size: 13px; font-weight:700; text-transform: uppercase; letter-spacing:.1em; color: var(--muted); margin-bottom: 12px; }
 .bz-decision { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .bz-decision small, .bz-seen small { display:block; font-size: 13px; font-weight:700; text-transform: uppercase; letter-spacing:.1em; color: var(--muted); margin-bottom: 6px; }
 .bz-decision .d { font-size: 28px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); line-height:1.25; }
@@ -294,6 +340,19 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
   .bz-hero { font-size: 96px; }
   .bz-card { padding: 24px 28px; }
 }
+/* Phones: the live meter and cart come before the products (columns stack), and nothing is sticky */
+@media (max-width: 640px) {
+  div[data-testid="stColumn"]:has(.st-key-cartbox) { order: -1; position: static; max-height: none; overflow: visible; min-width: 0; }
+  .st-key-nudgebox { margin-top: 8px !important; }
+  .nm-hero { font-size: 44px; }
+  .bz-result { grid-template-columns: 1fr; gap: 16px; }
+  .bz-card { padding: 20px; }
+  .bz-hero { font-size: 72px; }
+  .bz-left-title { font-size: 28px; }
+  .nm-chart.big { grid-template-columns: minmax(0,1fr) 104px; column-gap: 10px; }
+  .nm-chart.big .nm-zl { font-size: 12.5px; }
+  .bz-phone { min-height: 420px; }
+}
 .bz-wild { margin-top: 24px; border-top: 1px solid var(--line, #e7e5e1); padding-top: 16px; }
 .bz-wild-title { font-weight: 600; font-size: 15px; margin-bottom: 10px; }
 .bz-wild img { width: 100%; max-height: 420px; object-fit: cover; border-radius: 12px; display: block; }
@@ -328,28 +387,105 @@ def euro(x: float) -> str:
 WORD_PARTS = {"view": "viewed", "cart": "added to cart", "start": "first click", "quick": "quick",
               "normal": "normal pace", "long": "long pause", "away": "came back later",
               "new": "new visitor", "returning": "returning visitor"}
+WORD_FULL = {"bought_recently": "bought in the last 14 days", "visits_1": "1 visit in 14 days",
+             "visits_2_4": "2–4 visits in 14 days", "visits_5plus": "5+ visits in 14 days",
+             "last_today": "last visit today", "last_1_3d": "last visit 1–3 days ago",
+             "last_4_14d": "last visit 4–14 days ago"}
 
 
 def word_label(word: str) -> str:
     """Model word -> plain words for the audience: "view_expensive_again_quick" -> "viewed · expensive · again · quick"."""
+    if word in WORD_FULL:
+        return WORD_FULL[word]
     return " · ".join(WORD_PARTS.get(part, part) for part in word.split("_"))
 
 
-def chips(words: list[str], last: int | None = None) -> str:
+def chips(words: list[str], last: int | None = None, count_earlier: bool = True) -> str:
     """Words as chips (raw model word in the tooltip). With `last`, only the latest ones plus a count of earlier ones."""
     shown = list(enumerate(words))
     more = ""
     if last and len(shown) > last:
-        more = f'<span class="bz-more">+ {len(shown) - last} earlier</span>'
+        more = f'<span class="bz-more">+ {len(shown) - last} earlier</span>' if count_earlier else ""
         shown = shown[-last:]
     return more + "".join(
-        f'<span class="bz-chip{" cart" if w.startswith("cart") else ""}{" start" if i == 0 else ""}" title="{esc(w)}">'
+        f'<span class="bz-chip{" cart" if w.startswith("cart") else ""}{" hist" if w in WORD_FULL else ""}'
+        f'{" start" if i == 0 else ""}" title="{esc(w)}">'
         f'{esc(word_label(w))}</span>' for i, w in shown)
+
+
+# --- Live chance: the model's score after every click, and the line chart of it ---------------------
+ZONE_OF = {NOTHING: 0, DISCOUNT: 1, REMINDER: 2}
+ZONE_NAME = ["No message", f"Reminder + {DISCOUNT_RATE:.0%}", "Reminder only"]
+ACTION_LINE = ["Would send: nothing", f"Would send: reminder + {DISCOUNT_RATE:.0%} off",
+               "Would send: reminder, no discount"]
+
+
+@st.cache_data(max_entries=20_000, show_spinner=False)
+def chance(words: tuple[str, ...]) -> float:
+    """predict() for one list of words, cached: the chart re-scores every earlier click on each rerun."""
+    return predict(list(words))
+
+
+def pct(p: float) -> int:
+    return round(p * 100)
+
+
+def chance_chart(hist: list[float], low: float, high: float, height: int = 120, big: bool = False,
+                 hint: str = "", end_label: str = "") -> str:
+    """Line chart of the chance after each click (x = start, click 1..n) on the three decision zones.
+    Shapes are HTML/SVG in % of the plot, colours come from the CSS tokens. Only the newest segment animates."""
+    n = len(hist) - 1
+    top = max(hist)
+    ymax = 0.5 if top <= 0.5 else min(1.0, math.ceil(top * 10) / 10)
+    dom = max(n, 6)                     # a short visit doesn't stretch across the whole width
+
+    def x(i: int) -> float:
+        return 4 + 92 * i / dom
+
+    def y(p: float) -> float:          # % from the bottom
+        return min(p, ymax) / ymax * 100
+
+    on = ZONE_OF[decide(hist[-1], generosity)]
+    lo, hi = y(low), y(high)
+    zones = (f'<div class="nm-zone z2{" on" if on == 2 else ""}" style="bottom:{hi:.2f}%;top:0"></div>'
+             f'<div class="nm-zone z1{" on" if on == 1 else ""}" style="bottom:{lo:.2f}%;height:{hi - lo:.2f}%"></div>'
+             f'<div class="nm-zone z0{" on" if on == 0 else ""}" style="bottom:0;height:{lo:.2f}%"></div>')
+    pts = [(x(i), 100 - y(p)) for i, p in enumerate(hist)]
+    line = ""
+    if n >= 1:
+        old = " L".join(f"{a:.2f},{b:.2f}" for a, b in pts[:-1])
+        (a0, b0), (a1, b1) = pts[-2], pts[-1]
+        line = (f'<svg class="nm-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'
+                + (f'<path d="M{old}" />' if n >= 2 else "") + '</svg>'
+                f'<svg class="nm-svg nm-new" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" '
+                f'style="--clip-from: inset(0 {100 - a0:.2f}% 0 0)"><path d="M{a0:.2f},{b0:.2f} L{a1:.2f},{b1:.2f}" /></svg>')
+    dots = "".join(f'<i class="nm-dot" style="left:{x(i):.2f}%;bottom:{y(p):.2f}%"></i>' for i, p in enumerate(hist[:-1]))
+    dots += f'<i class="nm-dot now z{on}" style="left:{x(n):.2f}%;bottom:{y(hist[-1]):.2f}%"></i>'
+
+    # zone names in the right gutter, centred on their zone but never on top of each other
+    gap, edge = (18, 9) if big else (15, 7)
+    lo_px, hi_px = low / ymax * height, min(high, ymax) / ymax * height
+    c0 = min(height - lo_px / 2, height - edge)
+    c1 = min(height - (lo_px + hi_px) / 2, c0 - gap)
+    c2 = max(min((height - hi_px) / 2, c1 - gap), edge)
+    names = "".join(f'<span class="nm-zl z{i}{" on" if i == on else ""}" style="top:{c:.1f}px">{ZONE_NAME[i]}</span>'
+                    for i, c in ((2, c2), (1, c1), (0, c0)))
+    label = (f"Chance to come back and buy after each click: " + ", ".join(f"{pct(p)}%" for p in hist)
+             + f". Zones: under {pct(low)}% no message, {pct(low)}–{pct(high)}% reminder + {DISCOUNT_RATE:.0%}, "
+             f"over {pct(high)}% reminder only.")
+    hint_html = f'<div class="nm-hint">{esc(hint)}</div>' if hint else ""
+    right = end_label or (f"click {n}" if n else "")
+    return (f'<div class="nm-chart{" big" if big else ""}" role="img" aria-label="{esc(label)}" style="--h:{height}px">'
+            f'<div class="nm-plot"><div class="nm-zones">{zones}</div><span class="nm-ymax">{ymax:.0%}</span>'
+            f'{line}{dots}{hint_html}</div>'
+            f'<div class="nm-gutter">{names}</div>'
+            f'<div class="nm-x"><span>start</span><span>{esc(right)}</span></div></div>')
 
 
 # --- State -----------------------------------------------------------------------------------------
 if "clicks" not in st.session_state:
-    st.session_state.update(clicks=[], cart=[], page="shop", product=None, limit=PAGE_SIZE, left=False)
+    st.session_state.update(clicks=[], cart=[], page="shop", product=None, limit=PAGE_SIZE, left=False,
+                            before=0, removed=False)
     _start = True
 else:
     _start = False
@@ -359,6 +495,7 @@ def log(event: str, pid: str) -> None:
     """Record a click the model understands (view or cart). A cart without a view first also records the
     view, because real shoppers almost always open a product before adding it (99.6% in the data)."""
     now = time.time()
+    st.session_state.update(before=len(st.session_state.clicks), removed=False)  # for "▲ +3 pts" after this action
     price = float(CATALOG.loc[pid, "price"])
     if event == "cart" and all(c["product_id"] != pid for c in st.session_state.clicks):
         st.session_state.clicks.append({"event": "view", "product_id": pid, "price": price, "time": now})
@@ -379,6 +516,7 @@ def add_to_cart(pid: str) -> None:
 def remove_from_cart(pid: str) -> None:
     # Not sent to the model: the training data has no remove clicks.
     st.session_state.cart.remove(pid)
+    st.session_state.update(before=len(st.session_state.clicks), removed=True)
 
 
 def go_shop() -> None:
@@ -394,17 +532,28 @@ def checkout() -> None:
 
 
 def new_visitor() -> None:
-    st.session_state.update(clicks=[], cart=[], page="shop", product=None, limit=PAGE_SIZE, left=False)
+    st.session_state.update(clicks=[], cart=[], page="shop", product=None, limit=PAGE_SIZE, left=False,
+                            before=0, removed=False)
 
+
+VISITS = {"1": 1, "2–4": 3, "5+": 5}                                        # label -> visits_14d
+LAST_VISIT = {"Today": 0.5, "1–3 days ago": 2.0, "4–14 days ago": 7.0}      # label -> days_since_last
 
 if _start:  # screenshot shortcuts (see the module docstring); a normal visit has no query parameters
     qp = st.query_params
+    views = [p for p in qp.get("views", "").split(",") if p in CATALOG.index]
+    for k, pid in enumerate(views):
+        log("view", pid)
+        st.session_state.clicks[-1]["time"] -= 25 * (len(views) - k)
     for pid in [p for p in qp.get("cart", "").split(",") if p in CATALOG.index]:
         add_to_cart(pid)
     if qp.get("view") in CATALOG.index:
         open_product(qp["view"])
     if qp.get("page") == "left":
         leave()
+    v = {"1": "1", "3": "2–4", "5": "5+"}.get(qp.get("visits", ""))
+    last = {"0.5": "Today", "2": "1–3 days ago", "7": "4–14 days ago"}.get(qp.get("last", ""), "1–3 days ago")
+    st.session_state.update(h_returning=bool(v), h_visits=v or "1", h_last=last, h_bought=qp.get("bought") == "1")
 
 # --- Presenter controls (sidebar, hidden until opened) ------------------------------------------------
 with st.sidebar:
@@ -412,11 +561,26 @@ with st.sidebar:
     generosity = st.slider("Shop owner: how generous with discounts?", 0, 100, 50, step=5) / 100
     low, high = cutoffs(generosity)
     st.caption(f"Under {low:.0%}: no message · {low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%} · over {high:.0%}: reminder only")
-    returning = st.toggle("This customer has visited in the last 14 days", value=False)
-    show_words = st.toggle("Show what Nudge sees", value=True)
-    st.button("New visitor", on_click=new_visitor, use_container_width=True)
-    if IS_PLACEHOLDER:
-        st.warning("Placeholder model: a hand-written rule, not the trained Transformer yet.")
+    returning = st.toggle("This customer has visited in the last 14 days", key="h_returning")
+    visits_14d, days_since_last, bought_14d = 0, None, False
+    if returning:   # the model's strongest signals: the % reacts as soon as these change
+        for k, v in (("h_visits", "1"), ("h_last", "1–3 days ago"), ("h_bought", False)):
+            st.session_state.setdefault(k, v)   # Streamlit forgets hidden widgets' values; start them again
+        visits_14d = VISITS[st.segmented_control("Visits in the last 14 days", list(VISITS), key="h_visits") or "1"]
+        days_since_last = LAST_VISIT[st.segmented_control("Last visit", list(LAST_VISIT), key="h_last") or "1–3 days ago"]
+        bought_14d = st.toggle("Bought something in the last 14 days", key="h_bought")
+    show_words = st.toggle("Show the words Nudge sees", value=True)
+    st.button("New visitor", on_click=new_visitor, width="stretch")
+
+
+def words_for(clicks: list[dict]) -> list[str]:
+    """The model input for these clicks plus the presenter's shopper history (same for panel and leave page)."""
+    return session_words(clicks, returning, visits_14d, bought_14d, days_since_last)
+
+
+def chance_history(clicks: list[dict]) -> list[float]:
+    """Chance after 0, 1, ..., n clicks: what Nudge would decide if the shopper left at that moment."""
+    return [chance(tuple(words_for(clicks[:k]))) for k in range(len(clicks) + 1)]
 
 
 def product_image(row) -> None:
@@ -478,23 +642,21 @@ with st.container(key="hdr"):
 
 # --- Result page: full width, the number is the hero ---------------------------------------------------
 if page == "left":
-    words = session_words(st.session_state.clicks, returning)
-    p = predict(words)
+    words = words_for(st.session_state.clicks)
+    hist = chance_history(st.session_state.clicks)
+    p = hist[-1]
     action = decide(p, generosity)
     with st.container(key="lefthead"):
         t1, t2 = st.columns([7, 1.6], vertical_alignment="bottom", gap="medium")
         t1.markdown('<div class="bz-eyebrow">The shopper left without buying</div>'
                     '<div class="bz-left-title">What does Nudge do now?</div>', unsafe_allow_html=True)
         t2.button("New visitor", on_click=new_visitor, key="left_new", width="stretch", icon=":material/refresh:")
-    on = {NOTHING: 0, DISCOUNT: 1, REMINDER: 2}[action]
-    zones = [(f"Under {low:.0%}: no message", low), (f"{low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%}", high - low),
-             (f"Over {high:.0%}: reminder only", 1 - high)]
-    bar = "".join(f'<div class="z z{i}{" on" if i == on else ""}" style="width:{w * 100:.1f}%"></div>' for i, (_, w) in enumerate(zones))
-    legend = "".join(f'<span class="{"on" if i == on else ""}"><i class="z{i}" style="background:{c}"></i>{t}</span>'
-                     for i, ((t, _), c) in enumerate(zip(zones, ["#8A9099", "#C93A25", "#2E3238"])))
+    n_clicks = len(st.session_state.clicks)
+    story = chance_chart(hist, low, high, height=150, big=True,
+                         end_label=f"left after {n_clicks} click{'' if n_clicks == 1 else 's'}" if n_clicks else "left")
     verdict, why = {
         NOTHING: ("No message", "Looks like just browsing. A message would only annoy them."),
-        REMINDER: ("Reminder only, no discount", "They will probably buy anyway, so the 10% stays in the shop."),
+        REMINDER: ("Reminder only, no discount", "A good chance they come back and buy on their own, so the 10% stays in the shop."),
         DISCOUNT: (f"Reminder + {DISCOUNT_RATE:.0%} discount", "They are on the fence. This is where a nudge pays off."),
     }[action]
     money = ""
@@ -516,14 +678,11 @@ if page == "left":
         img = thumb(first["image"], 480) if first is not None else ""
         pic = f'<img src="{img}" alt="">' if img else ""
         chat = f'<div class="bz-day">Today</div><div class="bz-bubble msg">{pic}<p>{text}</p><small>{time.strftime("%H:%M")}</small></div>'
-    pin = min(max(p, 0.01), 0.99) * 100
     st.markdown(
         f'<div class="bz-result"><div class="bz-card">'
-        f'<div class="bz-hero-label">Chance they come back and buy within 7 days <b>without any message</b></div>'
-        f'<div class="bz-hero">{p * 100:.0f}<sup>%</sup></div>'
-        f'<div class="bz-scale" role="img" aria-label="{p:.0%} on a scale from 0 to 100%">{bar}'
-        f'<div class="pin" style="left:{pin:.1f}%"><span>{p:.0%}</span></div></div>'
-        f'<div class="bz-legend">{legend}</div>'
+        f'<div class="bz-hero-label">Chance they come back and buy on their own within 7 days <b>without any message</b></div>'
+        f'<div class="bz-hero">{pct(p)}<sup>%</sup></div>'
+        f'<div class="bz-story"><small>The chance after each click</small>{story}</div>'
         f'<div class="bz-decision"><small>Decision</small><div class="d">{verdict}</div><div class="why">{why}</div>{money}</div>'
         f'<div class="bz-seen"><small>What Nudge saw</small><div class="bz-chips">{chips(words)}</div></div>'
         f'</div><div class="bz-phonecol"><div class="bz-phone"><div class="bz-phone-top"><div class="bz-ava">m</div><div><b>{SHOP}</b>'
@@ -531,12 +690,37 @@ if page == "left":
         f'</div></div>', unsafe_allow_html=True)
     st.stop()
 
-main, side = st.columns([2.8, 1], gap="large")
+main, side = st.columns([2.6, 1], gap="large")
 
 # --- Cart + what Nudge sees (right column) -----------------------------------------------------------
 with side:
-    # line the cart card up with the first row of photos (measured: below the page title / the back link)
-    st.markdown(f'<style>.st-key-cartbox {{ margin-top: {74 if page == "shop" else 44}px; }}</style>', unsafe_allow_html=True)
+    # line the first card up with the first row of photos (measured: below the page title / the back link)
+    st.markdown(f'<style>.st-key-nudgebox {{ margin-top: {74 if page == "shop" else 44}px; }}</style>', unsafe_allow_html=True)
+    with st.container(key="nudgebox"):
+        clicks = st.session_state.clicks
+        words = words_for(clicks)
+        hist = chance_history(clicks)
+        now = hist[-1]
+        on = ZONE_OF[decide(now, generosity)]
+        if not clicks:
+            delta = f'<span class="nm-delta">start value, {"returning" if returning else "new"} visitor</span>'
+        elif st.session_state.removed:
+            delta = '<span class="nm-delta">same: removing isn\'t a click the model knows</span>'
+        else:
+            d = pct(now) - pct(hist[min(st.session_state.before, len(hist) - 1)])
+            delta = f'<span class="nm-delta">{"▲ +" if d > 0 else "▼ −" if d < 0 else ""}{abs(d) if d else "no change"}{" pts" if d else ""}</span>'
+        count = f"last 5 of {len(words)} words" if len(words) > 5 else f"{len(words)} word{'' if len(words) == 1 else 's'}"
+        seen = (f'<div class="nm-words"><div class="nm-words-head" title="One word per click: what they did · price · '
+                f'seen before · pace"><b>What Nudge sees</b><span>{count}</span></div>'
+                f'<div class="bz-chips">{chips(words, last=5, count_earlier=False)}</div></div>') if show_words else ""
+        st.markdown(
+            f'<div class="bz-nudge-title"><i></i>Nudge · live</div>'
+            f'<div class="nm-label">If they left now</div>'
+            f'<div class="nm-hero-row"><span class="nm-hero">{pct(now)}<sup>%</sup></span>{delta}</div>'
+            f'<div class="nm-sub">chance they come back and buy on their own within 7 days</div>'
+            + chance_chart(hist, low, high, hint="" if clicks else "Browse or add something to cart to see it move")
+            + f'<div class="nm-act z{on}"><i></i>{ACTION_LINE[on]}</div>' + seen,
+            unsafe_allow_html=True)
     with st.container(key="cartbox"):
         n = len(st.session_state.cart)
         st.markdown(f'<div class="bz-panel-title">Your cart <span>{n} item{"" if n == 1 else "s"}</span></div>',
@@ -556,12 +740,6 @@ with side:
         st.markdown(f'<div class="bz-total"><span>Total</span><b>{euro(cart_value)}</b></div>', unsafe_allow_html=True)
         st.button("Checkout", on_click=checkout, width="stretch", type="primary", disabled=not st.session_state.cart)
         st.button("Leave the shop", on_click=leave, width="stretch")
-    if show_words:
-        with st.container(key="nudgebox"):
-            words = session_words(st.session_state.clicks, returning)
-            st.markdown(f'<div class="bz-nudge-title"><i></i>What Nudge sees</div><div class="bz-chips">{chips(words, last=7)}</div>'
-                        f'<div class="bz-nudge-note">Every click becomes one word: what you did · price · seen before? · time since the last click.</div>',
-                        unsafe_allow_html=True)
 
 # --- Pages -------------------------------------------------------------------------------------------
 with main:
