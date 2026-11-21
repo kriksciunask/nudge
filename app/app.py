@@ -228,15 +228,15 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 /* --- Live meter: the chance after every click (every part has a fixed height, so nothing jumps) --- */
 .nm-label { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-top: 10px; }
 .nm-sub { font-size: 14px; line-height: 1.4; color: var(--muted); min-height: 2.8em; margin-top: 2px; }
-.nm-hero-row { display:flex; align-items:baseline; gap: 12px; height: 60px; }
+.nm-hero-row { display:flex; align-items:baseline; gap: 10px; height: 62px; }
 .nm-hero { font-size: 58px; font-weight: 800; line-height: 1; letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
-.nm-hero sup { font-size: .4em; vertical-align: top; position: relative; top: .22em; margin-left: 3px; letter-spacing: 0; color: var(--muted); }
-.nm-delta { font-size: 14px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
+.nm-hero .pc { font-size: .5em; margin-left: 2px; letter-spacing: 0; color: var(--muted); }
+.nm-delta { font-size: 15px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
   min-width: 0; animation: nm-fade .4s ease-out both; }
-.nm-chart { --y: 36px; --lab: 118px; display:grid; grid-template-columns: var(--y) minmax(0,1fr); grid-template-rows: var(--h) 22px; margin-top: 12px; }
-.nm-chart.big { --y: 42px; --lab: 158px; }
+.nm-chart { --y: 42px; --lab: 128px; display:grid; grid-template-columns: var(--y) minmax(0,1fr); grid-template-rows: var(--h) 24px; margin-top: 12px; }
+.nm-chart.big { --y: 46px; --lab: 162px; }
 .nm-y { position: relative; }
-.nm-y span { position:absolute; right: 7px; transform: translateY(50%); font-size: 12px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nm-y span { position:absolute; right: 7px; transform: translateY(50%); font-size: 14px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
 .nm-y span.cut { font-weight: 700; color: var(--ink-2); }
 .nm-plot { position: relative; }
 .nm-zones { position:absolute; inset:0; border-radius: 8px; overflow:hidden; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); }
@@ -248,7 +248,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .nm-zone.z1.on { background: color-mix(in srgb, var(--accent) 16%, var(--paper)); }
 .nm-zone.z2.on { background: color-mix(in srgb, var(--ink-2) 10%, var(--paper)); }
 .nm-cut { position:absolute; left:0; right:0; height:0; border-top: 1.5px dashed color-mix(in srgb, var(--ink-2) 45%, transparent); }
-.nm-zl { position:absolute; right: 10px; transform: translateY(-50%); font-size: 13px; line-height: 1.2; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.nm-zl { position:absolute; right: 10px; transform: translateY(-50%); font-size: 14px; line-height: 1.2; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .nm-zl.on { font-weight: 800; }
 .nm-zl.z0.on { color: var(--ink-2); } .nm-zl.z1.on { color: var(--accent); } .nm-zl.z2.on { color: var(--ink); }
 .nm-line { position:absolute; top:0; bottom:0; left:0; right: var(--lab); }
@@ -256,23 +256,29 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .nm-svg path { fill:none; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .nm-new { animation: nm-draw .45s cubic-bezier(.2,.7,.2,1) both; }
 .nm-dot { position:absolute; width:7px; height:7px; margin: 0 0 -3.5px -3.5px; border-radius:50%; background: var(--ink); }
-.nm-dot.now { width:14px; height:14px; margin: 0 0 -7px -7px; box-shadow: 0 0 0 3px var(--paper); animation: nm-pop .35s .25s cubic-bezier(.2,.7,.2,1.3) both; }
+.nm-dot.now { width:14px; height:14px; margin: 0 0 -7px -7px; box-shadow: 0 0 0 4px var(--paper); animation: nm-pop .35s .25s cubic-bezier(.2,.7,.2,1.3) both; }
+.nm-val { position:absolute; transform: translateX(-50%); margin-bottom: 13px; font-size: 14px; font-weight: 800; line-height: 1.2;
+  padding: 1px 6px; border-radius: 6px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); font-variant-numeric: tabular-nums;
+  white-space: nowrap; animation: nm-pop .35s .25s cubic-bezier(.2,.7,.2,1.3) both; }
+.nm-val.below { margin-bottom: -36px; }
+.nm-val.z0 { color: var(--ink-2); } .nm-val.z1 { color: var(--accent); } .nm-val.z2 { color: var(--ink); }
+.nm-chart.big .nm-val { font-size: 16px; margin-bottom: 16px; }
+.nm-chart.big .nm-val.below { margin-bottom: -42px; }
 .nm-dot.now.z0 { background: var(--muted); } .nm-dot.now.z1 { background: var(--accent); } .nm-dot.now.z2 { background: var(--ink); }
-.nm-hint { position:absolute; left: 14%; right: 0; top: 30%; transform: translateY(-50%); font-size: 13px; line-height: 1.4; color: var(--ink-2);
-  background: var(--paper); padding: 6px 9px; border-radius: 6px; box-shadow: 0 0 0 1px var(--line), 0 2px 6px -2px rgba(20,22,26,.12); }
-.nm-x { grid-column: 2; display:flex; justify-content:space-between; align-items:flex-end; font-size: 12px; color: var(--muted); padding: 0 var(--lab) 0 0; gap: 12px; white-space: nowrap; }
-.nm-chart.big .nm-x { padding-right: calc(var(--lab) - 96px); }
+.nm-x { grid-column: 2; display:flex; justify-content:space-between; align-items:flex-end; font-size: 14px; color: var(--muted); padding: 0 var(--lab) 0 0; gap: 12px; white-space: nowrap; }
+.nm-chart.big .nm-x { padding-right: calc(var(--lab) - 110px); }
 .nm-chart.big .nm-zl { font-size: 15px; }
-.nm-chart.big .nm-y span, .nm-chart.big .nm-x { font-size: 13px; }
+.nm-chart.big .nm-y span, .nm-chart.big .nm-x { font-size: 15px; }
 .nm-chart.big .nm-dot { width:9px; height:9px; margin: 0 0 -4.5px -4.5px; }
 .nm-chart.big .nm-dot.now { width:18px; height:18px; margin: 0 0 -9px -9px; }
 .nm-chart.big .nm-svg path { stroke-width: 3; }
-.nm-act { display:flex; align-items:flex-start; gap: 8px; margin-top: 12px; font-size: 15px; line-height: 1.3; font-weight: 700; height: 2.6em; }
-.nm-act span { text-wrap: balance; }
-.nm-act i { width: 9px; height: 9px; border-radius: 2px; flex: none; margin-top: .38em; }
-.nm-act.z0 { color: var(--ink-2); } .nm-act.z0 i { background: var(--muted); }
-.nm-act.z1 { color: var(--accent); } .nm-act.z1 i { background: var(--accent); }
-.nm-act.z2 { color: var(--ink); } .nm-act.z2 i { background: var(--ink); }
+.nm-act { margin-top: 12px; }
+.nm-act small { display:block; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.nm-act b { display:flex; align-items:center; gap: 9px; font-size: 19px; font-weight: 800; letter-spacing: -.01em; line-height: 1.3; white-space: nowrap; }
+.nm-act i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.nm-act.z0 b { color: var(--ink-2); } .nm-act.z0 i { background: var(--muted); }
+.nm-act.z1 b { color: var(--accent); } .nm-act.z1 i { background: var(--accent); }
+.nm-act.z2 b { color: var(--ink); } .nm-act.z2 i { background: var(--ink); }
 .nm-why { font-size: 13.5px; line-height: 1.4; color: var(--muted); min-height: 2.8em; margin-top: 2px; }
 .nm-words { margin-top: 12px; padding: 12px 0 10px 0; border-top: 1px solid var(--line-2); }
 .nm-words-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px; }
@@ -283,7 +289,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 @keyframes nm-draw { from { clip-path: var(--clip-from); } to { clip-path: inset(0 0 0 0); } }
 @keyframes nm-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes nm-fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .nm-new, .nm-dot.now, .nm-delta { animation: none; } .nm-zone { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .nm-new, .nm-dot.now, .nm-val, .nm-delta { animation: none; } .nm-zone { transition: none; } }
 
 /* --- Result page ("the shopper left") ----------------------------------------------------- */
 .bz-eyebrow { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing:.12em; color: var(--muted); margin-top: 16px; }
@@ -358,8 +364,8 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
   .bz-card { padding: 20px; }
   .bz-hero { font-size: 72px; }
   .bz-left-title { font-size: 28px; }
-  .nm-chart.big { --lab: 128px; }
-  .nm-chart.big .nm-zl { font-size: 13.5px; }
+  .nm-chart.big { --lab: 132px; }
+  .nm-chart.big .nm-zl { font-size: 14px; }
 }
 .bz-wild { margin-top: 24px; border-top: 1px solid var(--line, #e7e5e1); padding-top: 16px; }
 .bz-wild-title { font-weight: 600; font-size: 15px; margin-bottom: 10px; }
@@ -424,8 +430,7 @@ def chips(words: list[str], last: int | None = None, count_earlier: bool = True)
 # --- Live chance: the model's score after every click, and the line chart of it ---------------------
 ZONE_OF = {NOTHING: 0, DISCOUNT: 1, REMINDER: 2}
 ZONE_NAME = ["No message", f"Reminder + {DISCOUNT_RATE:.0%}", "Reminder only"]
-ACTION_LINE = ["If they leave now → no message", f"If they leave now → reminder + {DISCOUNT_RATE:.0%} off",
-               "If they leave now → reminder, no discount"]
+ACTION_LINE = ["No message", f"Reminder + {DISCOUNT_RATE:.0%} off", "Reminder, no discount"]
 BAND_WORDS = {"cheap": "a cheap", "mid": "a mid-priced", "expensive": "an expensive"}
 PACE_WORDS = {"start": "first click", "quick": "quick pace", "normal": "normal pace", "long": "after a long pause",
               "away": "after a 30+ min break"}
@@ -438,7 +443,7 @@ def why_line(words: list[str]) -> str:
                                           for h in hist) if hist else "")) if words[0] == "returning" else "New visitor"
     last = words[-1]
     if last in START_WORDS_SET or last in WORD_FULL:
-        return f"{who}, nothing clicked yet."
+        return f"{who}, nothing clicked yet. Browse or add something to cart to see it move."
     parts = last.split("_")
     item = f"{BAND_WORDS[parts[1]]} item"
     did = f"added {item} to cart" if parts[0] == "cart" else f"viewed {item}" + (" again" if "again" in parts else "")
@@ -457,7 +462,7 @@ def pct(p: float) -> int:
 
 
 def chance_chart(hist: list[float], low: float, high: float, height: int = 168, big: bool = False,
-                 hint: str = "", end_label: str = "") -> str:
+                 end_label: str = "") -> str:
     """Line chart of the chance after each click (x = start, click 1..n) on the three decision zones, with the two
     cut-offs as dashed lines. Zones span the full width; the line stays left of the zone names (--lab).
     Shapes are HTML/SVG in % of the plot, colours come from the CSS tokens. Only the newest segment animates."""
@@ -480,7 +485,7 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
     cuts = f'<i class="nm-cut" style="bottom:{lo:.2f}%"></i><i class="nm-cut" style="bottom:{hi:.2f}%"></i>'
 
     # y axis: 0 / half / top, plus the two cut-off values; a tick too close to a cut-off gives way
-    near = 20 / height * 100
+    near = 21 / height * 100
     ticks = [(y(v), f"{pct(v)}%" if v else "0", "") for v in (0, ymax / 2, ymax)
              if abs(y(v) - lo) > near and abs(y(v) - hi) > near]
     ticks += [(lo, f"{pct(low)}%", " cut"), (hi, f"{pct(high)}%", " cut")]
@@ -497,7 +502,9 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
                 f'style="--clip-from: inset(0 {100 - a0:.2f}% 0 0)"><path d="M{a0:.2f},{b0:.2f} L{a1:.2f},{b1:.2f}" /></svg>')
     dots = "".join(f'<i class="nm-dot" style="left:{x(i):.2f}%;bottom:{y(p):.2f}%"></i>' for i, p in enumerate(hist[:-1]))
     dots += f'<i class="nm-dot now z{on}" style="left:{x(n):.2f}%;bottom:{y(hist[-1]):.2f}%"></i>'
-    hint_html = f'<div class="nm-hint">{esc(hint)}</div>' if hint else ""
+    vy = y(hist[-1])   # value tag above the dot (below it near the top), on its own background so no line crosses it
+    dots += (f'<span class="nm-val z{on}{" below" if vy > 75 else ""}" style="left:{x(n):.2f}%;bottom:{vy:.2f}%">'
+             f'{pct(hist[-1])}%</span>')
 
     # zone names at the right edge, centred on their zone but never on top of each other
     gap, edge = (20, 10) if big else (17, 9)
@@ -514,7 +521,7 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
     return (f'<div class="nm-chart{" big" if big else ""}" role="img" aria-label="{esc(label)}" style="--h:{height}px">'
             f'<div class="nm-y">{yaxis}</div>'
             f'<div class="nm-plot"><div class="nm-zones">{zones}{cuts}</div>{names}'
-            f'<div class="nm-line">{line}{dots}{hint_html}</div></div>'
+            f'<div class="nm-line">{line}{dots}</div></div>'
             f'<div class="nm-x"><span>start</span><span>{esc(right)}</span></div></div>')
 
 
@@ -693,7 +700,7 @@ if page == "left":
     verdict, why = {
         NOTHING: ("No message", "Looks like just browsing. A message would only annoy them."),
         REMINDER: ("Reminder only, no discount", "A good chance they come back and buy on their own, so the 10% stays in the shop."),
-        DISCOUNT: (f"Reminder + {DISCOUNT_RATE:.0%} discount", "In the middle range, where a discount is most likely to change the outcome."),
+        DISCOUNT: (f"Reminder + {DISCOUNT_RATE:.0%} discount", "They're undecided, so a discount has the most room to matter. An A/B test would confirm it."),
     }[action]
     money = ""
     if action == REMINDER and cart_value:
@@ -753,10 +760,10 @@ with side:
         st.markdown(
             f'<div class="bz-nudge-title"><i></i>Nudge · live</div>'
             f'<div class="nm-label">If they left now</div>'
-            f'<div class="nm-hero-row"><span class="nm-hero">{pct(now)}<sup>%</sup></span>{delta}</div>'
+            f'<div class="nm-hero-row"><span class="nm-hero">{pct(now)}<span class="pc">%</span></span>{delta}</div>'
             f'<div class="nm-sub">chance they come back and buy on their own within 7 days</div>'
-            + chance_chart(hist, low, high, hint="" if clicks else "Browse or add something to cart to see it move")
-            + f'<div class="nm-act z{on}"><i></i><span>{ACTION_LINE[on]}</span></div>'
+            + chance_chart(hist, low, high)
+            + f'<div class="nm-act z{on}"><small>Nudge would send</small><b><i></i>{ACTION_LINE[on]}</b></div>'
             f'<div class="nm-why">{esc(why_line(words))}</div>' + seen,
             unsafe_allow_html=True)
     with st.container(key="cartbox"):

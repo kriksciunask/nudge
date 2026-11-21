@@ -17,7 +17,7 @@ def panel(at) -> str:
 
 
 def chance_shown(at) -> int:
-    return int(re.search(r'class="nm-hero">(\d+)<sup>', panel(at)).group(1))
+    return int(re.search(r'class="nm-hero">(\d+)<span class="pc">', panel(at)).group(1))
 
 
 def points(at) -> int:
@@ -39,7 +39,7 @@ def test_meter_starts_calm():
     at = fresh()
     html = panel(at)
     assert points(at) == 1
-    assert "Browse or add something to cart to see it move" in html
+    assert "Browse or add something to cart to see it move" in html and 'class="nm-val' in html
     assert "start, new visitor" in html
     assert words_shown(at) == ["new"]
 
@@ -77,7 +77,7 @@ def test_history_controls_change_words_and_chance():
 def test_panel_copy_and_chips():
     at = fresh()
     html = panel(at)
-    assert "If they leave now → no message" in html and "New visitor, nothing clicked yet." in html
+    assert "Nudge would send</small><b><i></i>No message</b>" in html and "New visitor, nothing clicked yet." in html
     next(b for b in at.button if b.key and b.key.startswith("gv_")).click().run()     # view 1 (product page)
     for _ in range(2):                                                                # views 2-3 from "You might also like"
         next(b for b in at.button if b.key and b.key.startswith("sv_")).click().run()
