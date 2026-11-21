@@ -233,7 +233,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .nm-hero .pc { font-size: .5em; margin-left: 2px; letter-spacing: 0; color: var(--muted); }
 .nm-delta { font-size: 15px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
   min-width: 0; animation: nm-fade .4s ease-out both; }
-.nm-chart { --y: 42px; --lab: 128px; display:grid; grid-template-columns: var(--y) minmax(0,1fr); grid-template-rows: var(--h) 24px; margin-top: 12px; }
+.nm-chart { --y: 42px; --lab: 138px; display:grid; grid-template-columns: var(--y) minmax(0,1fr); grid-template-rows: var(--h) 24px; margin-top: 12px; }
 .nm-chart.big { --y: 46px; --lab: 162px; }
 .nm-y { position: relative; }
 .nm-y span { position:absolute; right: 7px; transform: translateY(50%); font-size: 14px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -257,13 +257,13 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .nm-new { animation: nm-draw .45s cubic-bezier(.2,.7,.2,1) both; }
 .nm-dot { position:absolute; width:7px; height:7px; margin: 0 0 -3.5px -3.5px; border-radius:50%; background: var(--ink); }
 .nm-dot.now { width:14px; height:14px; margin: 0 0 -7px -7px; box-shadow: 0 0 0 4px var(--paper); animation: nm-pop .35s .25s cubic-bezier(.2,.7,.2,1.3) both; }
-.nm-val { position:absolute; transform: translateX(-50%); margin-bottom: 13px; font-size: 14px; font-weight: 800; line-height: 1.2;
+.nm-val { position:absolute; translate: -50% 0; font-size: 14px; font-weight: 800; line-height: 1.2; height: 20px; box-sizing: border-box;
   padding: 1px 6px; border-radius: 6px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); font-variant-numeric: tabular-nums;
   white-space: nowrap; animation: nm-pop .35s .25s cubic-bezier(.2,.7,.2,1.3) both; }
-.nm-val.below { margin-bottom: -36px; }
+.nm-val.lean { translate: calc(-100% + 8px) 0; }            /* right half: grow left, away from the zone names */
+.nm-val.side-r { translate: 14px 0; } .nm-val.side-l { translate: calc(-100% - 14px) 0; }
 .nm-val.z0 { color: var(--ink-2); } .nm-val.z1 { color: var(--accent); } .nm-val.z2 { color: var(--ink); }
-.nm-chart.big .nm-val { font-size: 16px; margin-bottom: 16px; }
-.nm-chart.big .nm-val.below { margin-bottom: -42px; }
+.nm-chart.big .nm-val { font-size: 16px; height: 23px; }
 .nm-dot.now.z0 { background: var(--muted); } .nm-dot.now.z1 { background: var(--accent); } .nm-dot.now.z2 { background: var(--ink); }
 .nm-x { grid-column: 2; display:flex; justify-content:space-between; align-items:flex-end; font-size: 14px; color: var(--muted); padding: 0 var(--lab) 0 0; gap: 12px; white-space: nowrap; }
 .nm-chart.big .nm-x { padding-right: calc(var(--lab) - 110px); }
@@ -502,9 +502,19 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
                 f'style="--clip-from: inset(0 {100 - a0:.2f}% 0 0)"><path d="M{a0:.2f},{b0:.2f} L{a1:.2f},{b1:.2f}" /></svg>')
     dots = "".join(f'<i class="nm-dot" style="left:{x(i):.2f}%;bottom:{y(p):.2f}%"></i>' for i, p in enumerate(hist[:-1]))
     dots += f'<i class="nm-dot now z{on}" style="left:{x(n):.2f}%;bottom:{y(hist[-1]):.2f}%"></i>'
-    vy = y(hist[-1])   # value tag above the dot (below it near the top), on its own background so no line crosses it
-    dots += (f'<span class="nm-val z{on}{" below" if vy > 75 else ""}" style="left:{x(n):.2f}%;bottom:{vy:.2f}%">'
-             f'{pct(hist[-1])}%</span>')
+    # value tag on its own background, kept inside the dot's zone: above the dot, else below, else beside it
+    th, g = (23, 15) if big else (20, 13)                     # tag height, gap from the dot's centre (px)
+    dy = y(hist[-1]) / 100 * height
+    z_lo, z_hi = [(0, low), (low, high), (high, ymax)][on]
+    b0, b1 = y(z_lo) / 100 * height, y(z_hi) / 100 * height
+    xn = x(n)
+    if b1 - (dy + g) >= th:
+        bottom, side = dy + g, "lean" if xn > 50 else ""
+    elif (dy - g) - b0 >= th:
+        bottom, side = dy - g - th, "lean" if xn > 50 else ""
+    else:
+        bottom, side = max(b0 + 1, min(dy - th / 2, b1 - th - 1)), "side-l" if xn > 55 else "side-r"
+    dots += (f'<span class="nm-val z{on} {side}" style="left:{xn:.2f}%;bottom:{bottom:.1f}px">{pct(hist[-1])}%</span>')
 
     # zone names at the right edge, centred on their zone but never on top of each other
     gap, edge = (20, 10) if big else (17, 9)
