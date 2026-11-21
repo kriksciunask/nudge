@@ -443,17 +443,24 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .st-key-owner [data-testid="stSlider"] { max-width: 520px; }
 .ow-title { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--ink); margin: 6px 0 14px 0; line-height: 1.2; }
 .ow-zones { color: var(--muted); font-size: 14px; margin: -6px 0 0 0; }
+.st-key-owner [data-testid="stSliderThumbValue"], .st-key-owner [data-testid="stSliderTickBar"] { display: none; }
+.ow-ends { display: flex; justify-content: space-between; max-width: 520px; padding: 0 6px; margin-top: -18px; margin-bottom: 14px; font-size: 14px; font-weight: 600; color: var(--muted); }
 .ow-grid { display: grid; grid-template-columns: 5fr 7fr; gap: 40px; align-items: start; margin-top: 20px; }
 .ow-lab { font-size: 16px; line-height: 1.4; color: var(--ink-2); font-weight: 500; max-width: 420px; }
 .ow-hero { font-size: 72px; line-height: 1; font-weight: 800; letter-spacing: -.04em; color: var(--ink); margin: 10px 0 8px 0; }
 .ow-vs { font-size: 16px; color: var(--muted); }
 .ow-vs b { color: var(--ink); font-weight: 700; }
-.ow-save { display: inline-block; margin-top: 10px; background: var(--ok-soft); color: var(--ok); font-weight: 700; font-size: 15px; padding: 4px 12px; border-radius: 999px; }
+.ow-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.ow-pill { display: inline-block; font-weight: 700; font-size: 15px; padding: 4px 12px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); }
+.ow-pill.cost { background: #FFF1D6; color: #8A5200; }
 .ow-cost { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
-.ow-cost .n { font-size: 32px; font-weight: 800; letter-spacing: -.03em; color: var(--ink); line-height: 1.1; }
+.ow-cost .n { font-size: 32px; font-weight: 800; letter-spacing: -.03em; color: var(--ink); line-height: 1.1; white-space: nowrap; }
 .ow-cost .n span { font-size: 16px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
 .ow-cost p { margin: 6px 0 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); max-width: 420px; }
-.ow-chart { position: relative; height: 250px; margin: 14px 12px 34px 56px; }
+.ow-end { margin: 22px 0 0 0; font-size: 18px; line-height: 1.45; font-weight: 600; color: var(--ink); max-width: 900px; }
+.ow-ct { font-size: 14px; font-weight: 700; color: var(--ink-2); margin: 0 0 0 56px; }
+.ow-chart { position: relative; height: 140px; margin: 18px 12px 26px 56px; }
+.ow-chart.last { margin-bottom: 34px; }
 .ow-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .ow-svg path { fill: none; vector-effect: non-scaling-stroke; }
 .ow-svg .grid { stroke: var(--line); stroke-width: 1; }
@@ -471,8 +478,11 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 @media (max-width: 640px) {
   .st-key-owner { padding: 20px 16px 18px 16px; margin-top: 24px; border-radius: 16px; }
   .ow-title { font-size: 22px; }
-  .ow-hero { font-size: 56px; }
-  .ow-chart { height: 220px; margin: 14px 8px 34px 50px; }
+  .ow-hero { font-size: 40px; }
+  .ow-chart { height: 172px; margin: 10px 8px 26px 50px; }
+  .ow-ct { margin-left: 50px; }
+  .ow-pre { display: none; }
+  .ow-cost .n { font-size: 26px; white-space: normal; } .ow-cost .n span { font-size: 15px; }
 }
 .bz-wild { margin-top: 24px; border-top: 1px solid var(--line, #e7e5e1); padding-top: 16px; }
 .bz-wild-title { font-weight: 600; font-size: 15px; margin-bottom: 10px; }
@@ -656,7 +666,7 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
     Shapes are HTML/SVG in % of the plot, colours come from the CSS tokens. Only the newest segment animates."""
     n = len(hist) - 1
     top = max(hist)
-    ymax = 0.5 if top <= 0.5 else min(1.0, math.ceil(top * 10) / 10)
+    ymax = 0.3 if top <= 0.3 and high < 0.3 else 0.5 if top <= 0.5 else min(1.0, math.ceil(top * 10) / 10)   # 0.3: keeps the 'no message' zone tall enough for its name
     dom = max(n, 6)                     # a short visit doesn't stretch across the whole width
 
     def x(i: int) -> float:            # % of the line area
@@ -674,8 +684,7 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 168, 
 
     # y axis: 0 / half / top, plus the two cut-off values; a tick too close to a cut-off gives way
     near = 21 / height * 100
-    ticks = [(y(v), f"{pct(v)}%" if v else "0", "") for v in (0, ymax / 2, ymax)
-             if abs(y(v) - lo) > near and abs(y(v) - hi) > near]
+    ticks = [(y(v), f"{pct(v)}%", "") for v in (ymax,) if abs(y(v) - lo) > near and abs(y(v) - hi) > near]   # top of the scale + the two cut-offs
     ticks += [(lo, f"{pct(low)}%", " cut"), (hi, f"{pct(high)}%", " cut")]
     yaxis = "".join(f'<span class="{c.strip()}" style="bottom:{b:.2f}%">{t}</span>' for b, t, c in ticks)
 
@@ -730,43 +739,58 @@ def money_curve() -> pd.DataFrame | None:
     return pd.read_csv(path).set_index("g") if path.exists() else None
 
 
-def owner_html(curve: pd.DataFrame, g: float) -> str:
-    """The owner's money view: one hero number, the cost, and the wasted-money curve across the slider."""
+def owner_panel(curve: pd.DataFrame, g: float, col: str, ymax: float, ticks: list, fmt, title: str,
+                tags: str, last: bool = False) -> str:
+    """One mini-panel of the owner chart: the Nudge curve over the slider range, the rule's flat line, the current point.
+    `tags` = "wasted" (curve rises: name goes below-right, or above-left at the generous end) or "left" (curve falls:
+    name goes above-right, or above-left at the generous end; the rule's name sits under its line)."""
     r = curve.loc[round(g, 2)]
-    wasted, rule = r["wasted_eur"], r["rule_wasted_eur"]
-    saved = round(100 * (1 - wasted / rule))
-    ymax = 135_000
-    gs = list(curve.index)
+    val, rule = r[col], r["rule_" + col]
     px = lambda gg: 100 * gg                                           # noqa: E731  (x in % of the plot)
     py = lambda v: 100 - 100 * v / ymax                                # noqa: E731  (y in % from the top)
-    grid = "".join(f'<path class="grid" d="M0,{py(v):.2f} L100,{py(v):.2f}"/>' for v in (0, 50_000, 100_000))
-    ylab = "".join(f'<span class="ow-y" style="bottom:{100 - py(v):.2f}%">{"€0" if not v else f"€{v // 1000}k"}</span>'
-                   for v in (0, 50_000, 100_000))
-    line = " L".join(f"{px(k):.2f},{py(curve.loc[k, 'wasted_eur']):.2f}" for k in gs)
-    low_y = 100 - py(wasted)                                           # dot height, % from the bottom
-    where = ("right:" + f"{100 - px(g):.2f}%;" if g > 0.55 else "left:" + f"{px(g):.2f}%;")
-    below = g <= 0.55                                                  # the line rises: free space is below-right / above-left
-    tag_y = f"top:calc({py(wasted):.2f}% + 14px)" if below else f"bottom:calc({low_y:.2f}% + 14px)"
-    label = (f"Discount money wasted on shoppers who would have bought anyway, by how generous the shop is. "
-             f"Discount everyone: {euro(rule)} at every setting. Nudge at this setting: {euro(wasted)}.")
-    chart = (f'<div class="ow-chart" role="img" aria-label="{esc(label)}">{ylab}'
-             f'<svg class="ow-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{grid}'
-             f'<path class="rule" d="M0,{py(rule):.2f} L100,{py(rule):.2f}"/>'
-             f'<path class="here" d="M{px(g):.2f},0 L{px(g):.2f},100"/>'
-             f'<path class="nudge" d="M{line}"/></svg>'
-             f'<span class="ow-t rule" style="bottom:calc({100 - py(rule):.2f}% + 8px)">Discount everyone: {euro(rule)}</span>'
-             f'<i class="ow-dot" style="left:{px(g):.2f}%;top:{py(wasted):.2f}%"></i>'
-             f'<span class="ow-t you" style="{where}{tag_y}">Nudge: {euro(wasted)}</span>'
-             f'<span class="ow-x" style="left:0">stingy</span><span class="ow-x" style="right:0">generous</span></div>')
+    grid = "".join(f'<path class="grid" d="M0,{py(v):.2f} L100,{py(v):.2f}"/>' for v, _ in ticks)
+    ylab = "".join(f'<span class="ow-y" style="bottom:{100 - py(v):.2f}%">{t}</span>' for v, t in ticks)
+    line = " L".join(f"{px(k):.2f},{py(curve.loc[k, col]):.2f}" for k in curve.index)
+    right = g > (0.55 if tags == "wasted" else 0.7)
+    x = f"right:{100 - px(g):.2f}%;" if right else f"left:{px(g):.2f}%;"
+    y = (f"top:calc({py(val):.2f}% + 14px)" if tags == "wasted" and not right
+         else f"bottom:calc({100 - py(val):.2f}% + {22 if right else 14}px)")
+    rule_y = (f"bottom:calc({100 - py(rule):.2f}% + 8px)" if tags == "wasted" else f"top:calc({py(rule):.2f}% + 8px)")
+    xs = ('<span class="ow-x" style="left:0">Stingy</span><span class="ow-x" style="right:0">Generous</span>' if last else "")
+    label = f"{title} across the slider. Discount everyone: {fmt(rule)}. Nudge at this setting: {fmt(val)}."
+    return (f'<div class="ow-ct">{esc(title)}</div>'
+            f'<div class="ow-chart{" last" if last else ""}" role="img" aria-label="{esc(label)}">{ylab}'
+            f'<svg class="ow-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{grid}'
+            f'<path class="rule" d="M0,{py(rule):.2f} L100,{py(rule):.2f}"/>'
+            f'<path class="here" d="M{px(g):.2f},0 L{px(g):.2f},100"/>'
+            f'<path class="nudge" d="M{line}"/></svg>'
+            f'<span class="ow-t rule" style="{rule_y}"><span class="ow-pre">Discount </span>everyone: {fmt(rule)}</span>'
+            f'<i class="ow-dot" style="left:{px(g):.2f}%;top:{py(val):.2f}%"></i>'
+            f'<span class="ow-t you" style="{x}{y}">Nudge: {fmt(val)}</span>{xs}</div>')
+
+
+def owner_html(curve: pd.DataFrame, g: float) -> str:
+    """The owner's money view: what the discounts waste, what leaving shoppers alone costs, both across the slider."""
+    r = curve.loc[round(g, 2)]
+    wasted, rule = r["wasted_eur"], r["rule_wasted_eur"]
+    left, rule_left = int(r["left_without_nudge"]), int(r["rule_left_without_nudge"])
+    saved, more = round(100 * (1 - wasted / rule)), round(100 * (left / rule_left - 1))
+    extra = left - rule_left
+    charts = (owner_panel(curve, g, "wasted_eur", 140_000, [(0, "€0"), (50_000, "€50k"), (100_000, "€100k")], euro,
+                          "Discount money wasted on shoppers who would have bought anyway", "wasted")
+              + owner_panel(curve, g, "left_without_nudge", 14_000, [(0, "0"), (5_000, "5k"), (10_000, "10k")],
+                            lambda v: f"{v:,.0f}", "Shoppers left without a nudge who did not come back", "left", last=True))
     return (f'<div class="ow-grid"><div>'
-            f'<div class="ow-lab">Discount money wasted on shoppers who would have bought anyway</div>'
+            f'<div class="ow-lab">Across 293k test visits: discount money wasted on shoppers who would have bought anyway</div>'
             f'<div class="ow-hero">{euro(wasted)}</div>'
             f'<div class="ow-vs">vs <b>{euro(rule)}</b> with "discount everyone"</div>'
-            f'<div class="ow-save">{saved}% less wasted</div>'
-            f'<div class="ow-cost"><div class="n">{int(r["left_without_nudge"]):,} '
-            f'<span>vs {int(r["rule_left_without_nudge"]):,} left without a nudge and did not come back</span></div>'
-            f'<p>The price of saving margin. Whether a discount would have won them back is unknown: only an A/B test can tell.</p></div>'
-            f'</div><div>{chart}</div></div>'
+            f'<div class="ow-pills"><span class="ow-pill">{saved}% less wasted</span>'
+            f'<span class="ow-pill cost">{more:+d}% left out</span></div>'
+            f'<div class="ow-cost"><div class="n">{left:,} <span>vs {rule_left:,} with discount everyone</span></div>'
+            f'<p>Shoppers left without a nudge who did not come back.</p></div>'
+            f'</div><div>{charts}</div></div>'
+            f'<p class="ow-end">At this setting: {saved}% less waste, {extra:,} more shoppers left alone. '
+            f'Only an A/B test can say whether that is a loss.</p>'
             f'<p class="ow-foot">Test set: 293k visits from shoppers the model never saw, Oct–Nov 2019, 1 in 4 shoppers of a real store (REES46). '
             f'Money = 10% of what they actually bought when they came back.</p>')
 
@@ -989,6 +1013,7 @@ if page == "left":
             st.session_state["gen_main"] = st.session_state["gen_side"]
             st.slider("How generous with discounts?", 0, 100, step=5, key="gen_main",
                       on_change=lambda: st.session_state.update(gen_side=st.session_state["gen_main"]))
+            st.markdown('<div class="ow-ends"><span>Stingy</span><span>Generous</span></div>', unsafe_allow_html=True)
             st.markdown(f'<p class="ow-zones">Under {low:.0%}: no message · {low:.0%}–{high:.0%}: reminder + {DISCOUNT_RATE:.0%} · over {high:.0%}: reminder only</p>'
                         + owner_html(curve, generosity), unsafe_allow_html=True)
     section, gridhtml = inside_html(words, p)

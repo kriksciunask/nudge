@@ -163,6 +163,39 @@ def test_owner_slider_moves_the_decision_cutoffs():
     assert at.sidebar.slider[0].value == 0 and "Under 8%" in owner_html_of(at)
 
 
+def meter_cutoffs(at) -> tuple[str, str]:
+    """The two cut-off ticks of the live meter chart (bold ticks), e.g. ("6%", "21%")."""
+    html = next(m.value for m in at.markdown if 'class="nm-chart' in m.value) if any('class="nm-chart' in m.value for m in at.markdown) else ""
+    return tuple(re.findall(r'class="cut"[^>]*>(\d+%)</span>', html))
+
+
+def test_two_sliders_are_one_state_both_ways():
+    from nudge.decision import cutoffs
+    at = fresh()
+    next(b for b in at.button if b.label == "Leave the shop").click().run()
+    assert not at.exception, at.exception
+    # presenter slider -> owner card and cut-offs
+    at.sidebar.slider[0].set_value(20).run()
+    low, high = cutoffs(0.2)
+    assert at.slider[0].value == 20 and f"Under {low:.0%}" in owner_html_of(at) and f"{high:.0%}" in owner_html_of(at)
+    assert meter_cutoffs(at) == (f"{low:.0%}", f"{high:.0%}")
+    # owner slider -> presenter slider, card and cut-offs
+    at.slider[0].set_value(90).run()
+    low, high = cutoffs(0.9)
+    assert at.sidebar.slider[0].value == 90 and f"Under {low:.0%}" in owner_html_of(at)
+    assert meter_cutoffs(at) == (f"{low:.0%}", f"{high:.0%}")
+    # and back once more, to be sure nothing sticks
+    at.sidebar.slider[0].set_value(50).run()
+    assert at.slider[0].value == 50 and at.sidebar.slider[0].value == 50
+
+
+def test_owner_view_names_the_cost_too():
+    at = fresh()
+    next(b for b in at.button if b.label == "Leave the shop").click().run()
+    html = owner_html_of(at)
+    assert "less wasted" in html and "% left out" in html and "more shoppers left alone" in html and "A/B test" in html
+
+
 if __name__ == "__main__":
     tests = [f for name, f in sorted(globals().items()) if name.startswith("test_")]
     for t in tests:
