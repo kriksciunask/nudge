@@ -23,7 +23,8 @@ from nudge.live import LiveBoard, fill_demo, summary
 FALLBACK_KEY = "mercato"      # used only when no board_key is set in secrets; set a real one on the cloud
 QR_JS = (Path(__file__).resolve().parent / "static" / "qrcode.min.js").read_text()   # vendored qrcodejs 1.0.0 (MIT), no CDN
 JUST_LEFT_SECONDS = 8         # how long a card stays highlighted after Leave
-MAX_CARDS = 24
+MAX_CARDS = 20
+LEFT_NAME = ["No message", f"+{DISCOUNT_RATE:.0%}", "Reminder"]       # short, so a leaver label never wraps
 ZONE_NAME = ["No message", f"Reminder + {DISCOUNT_RATE:.0%}", "Reminder only"]
 
 
@@ -100,9 +101,9 @@ def _card(r: dict, now: float) -> str:
     if r["status"] == "bought":
         cls, line = "bought", "Bought, no message"
     elif just:
-        cls, line = "left just" + (" fresh" if now - r["left_at"] < 3 else ""), f"Left → {name}"
+        cls, line = "left just" + (" fresh" if now - r["left_at"] < 3 else ""), f"Left → {LEFT_NAME[r['zone']]}"
     elif r["status"] == "left":
-        cls, line = "left", f"Left → {name}"
+        cls, line = "left", f"Left → {LEFT_NAME[r['zone']]}"
     else:
         cls, line = "", name
     cart = f'<span class="cart" title="Has a cart">{BAG}€{r["cart_value"]:.0f}</span>' if r["n_cart"] and r["cart_value"] else ""
@@ -118,24 +119,33 @@ def _body(rows: list[dict], now: float) -> str:
                 '<p>Open your phone camera on the code, then shop like you normally would. '
                 'Your card appears here and Nudge\'s guess moves with every click.</p></div>')
     s = summary(rows)
-    segs = "".join(f'<span class="seg z{z}" style="flex:{s[k]}"></span>' for z, k in ((1, "discount"), (2, "reminder"), (0, "none")))
-    cells = "".join(f'<div class="cell z{z}"><b>{s[k]}</b><span>{ZONE_NAME[z]}</span></div>'
-                    for z, k in ((1, "discount"), (2, "reminder"), (0, "none")))
-    cards = "".join(_card(r, now) for r in rows[:MAX_CARDS])
+    segs = "".join(f'<span class="seg z{z}" style="flex:{s[k]}"></span><span class="seg z{z} left" style="flex:{s[kl]}"></span>'
+                   for z, k, kl in ((1, "discount", "left_discount"), (2, "reminder", "left_reminder"), (0, "none", "left_none")))
+    cells = "".join(f'<div class="cell z{z}"><b>{s[k]}</b><span>{ZONE_NAME[z]}</span>'
+                    + (f'<em>+{s[kl]} left</em>' if s[kl] else "") + '</div>'
+                    for z, k, kl in ((1, "discount", "left_discount"), (2, "reminder", "left_reminder"), (0, "none", "left_none")))
+    # shopping now first (most recent activity), then the "Already left" group
+    now_rows = [r for r in rows if r["status"] != "left"]
+    left_rows = [r for r in rows if r["status"] == "left"]
+    cards = "".join(_card(r, now) for r in now_rows[:MAX_CARDS])
+    room = MAX_CARDS - min(len(now_rows), MAX_CARDS)
+    if left_rows and room > 0:
+        cards += '<div class="bd-sep">Already left</div>' + "".join(_card(r, now) for r in left_rows[:room])
     more = f'<div class="bd-more">+{len(rows) - MAX_CARDS} more shoppers</div>' if len(rows) > MAX_CARDS else ""
-    final = ""
-    if s["left"]:
-        parts = " · ".join(f'{s[k]} {ZONE_NAME[z]}' for z, k in ((1, "left_discount"), (2, "left_reminder"), (0, "left_none")) if s[k])
-        final = f'<div class="bd-final">Left already ({s["left"]}), final decisions: <b>{parts}</b></div>'
-    if s["left_carts"]:
-        final += (f'<div class="bd-total">Discounts Nudge gave: <b class="a">{s["left_carts_discounted"]}</b>'
-                  f'<span> vs </span><b>{s["left_carts"]}</b> with discount everyone</div>')
+    if s["left_carts"] >= 5:
+        held = DISCOUNT_RATE * s["left_held_value"]
+        total = (f'Leavers with a cart: <b>{s["left_carts"]}</b> · Discount everyone gives <b>{s["left_carts"]}</b> discounts · '
+                 f'Nudge gives <b>{s["left_carts_discounted"]}</b> and holds back <b>€{held:,.0f}</b> of discounts '
+                 f'({DISCOUNT_RATE:.0%} of those carts)')
+    else:
+        total = "Room total appears after 5 shoppers leave with a cart"
     return (f'<div class="bd-eyebrow"><i></i>Nudge · live audience board</div>'
             f'<div class="bd-hero"><span class="num">{s["shoppers"]}</span><span class="lab">joined · '
             f'<b>{s["shopping"]}</b> shopping now</span></div>'
-            f'<div class="bd-sum"><div class="t">If they left this second, Nudge would send</div>'
+            f'<div class="bd-sum"><div class="t">If they left this second, Nudge would send <span>(hatched: already left, final)</span></div>'
             f'<div class="bar" role="img" aria-label="Nudge decisions across the room">{segs}</div>'
-            f'<div class="cells">{cells}</div>{final}</div>'
+            f'<div class="cells">{cells}</div>'
+            f'<div class="bd-total">{total}</div></div>'
             f'<div class="bd-grid">{cards}</div>{more}')
 
 
@@ -188,7 +198,12 @@ CSS = """
 .bd-sum { margin-bottom: 22px; }
 .bd-sum .t { font-size: 20px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
 .bd-sum .bar { display:flex; height: 18px; border-radius: 9px; overflow:hidden; background: var(--soft-2); gap:3px; }
+.bd-sum .t span { font-weight: 500; }
+.cell em { font-style: normal; font-size: 20px; font-weight: 600; color: var(--faint); }
+.bd-sep { grid-column: 1 / -1; margin-top: 6px; font-size: 20px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .seg.z0 { background: var(--faint); } .seg.z1 { background: var(--accent); } .seg.z2 { background: var(--ink); }
+.seg.left { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.8) 0 3px, transparent 3px 8px); }
+
 .bd-sum .cells { display:grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 14px; }
 .cell { display:flex; align-items:baseline; gap:12px; }
 .cell b { font-size: clamp(38px, 5.2vh, 54px); font-weight: 800; letter-spacing:-.03em; line-height:1; }
@@ -205,7 +220,7 @@ CSS = """
 .bd-card .pct sup { font-size: 20px; font-weight: 600; letter-spacing:0; margin-left:1px; vertical-align: baseline; position: relative; top: -.55em; }
 .bd-card .sp { flex:none; overflow: visible; }
 .bd-card .sp polyline { fill:none; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
-.bd-card .r3 { display:flex; align-items:center; gap:8px; font-size: 18px; font-weight:700; line-height:1.2; }
+.bd-card .r3 { white-space: nowrap; display:flex; align-items:center; gap:8px; font-size: 18px; font-weight:700; line-height:1.2; }
 .bd-card .r3 i { width:10px; height:10px; border-radius:50%; flex:none; }
 .bd-card.z0 .pct, .bd-card.z0 .r3 { color: var(--muted); } .bd-card.z0 .sp polyline { stroke: var(--faint); } .bd-card.z0 .sp circle, .bd-card.z0 .r3 i { fill: var(--faint); background: var(--faint); }
 .bd-card.z1 .pct, .bd-card.z1 .r3 { color: var(--accent); } .bd-card.z1 .sp polyline { stroke: var(--accent); } .bd-card.z1 .sp circle, .bd-card.z1 .r3 i { fill: var(--accent); background: var(--accent); }
@@ -217,8 +232,7 @@ CSS = """
 .bd-card.fresh { animation: bd-flash 1s ease-out 1; }
 .bd-card.just.z0 { border-color: var(--muted); } .bd-card.just.z1 { border-color: var(--accent); background: var(--accent-soft); } .bd-card.just.z2 { border-color: var(--ink); }
 @keyframes bd-flash { 0% { box-shadow: 0 0 0 0 rgba(20,22,26,.28); } 100% { box-shadow: 0 0 0 16px rgba(20,22,26,0); } }
-.bd-final { margin-top: 18px; font-size: 22px; color: var(--ink-2); } .bd-final b { font-weight: 700; color: var(--ink); }
-.bd-total { margin-top: 8px; font-size: 26px; font-weight: 600; color: var(--ink-2); } .bd-total b { font-weight: 800; color: var(--ink); } .bd-total b.a { color: var(--accent); }
+.bd-total { margin-top: 16px; font-size: 22px; font-weight: 500; line-height: 1.4; color: var(--ink-2); } .bd-total b { font-weight: 800; color: var(--ink); }
 .bd-warn { margin: 0 0 14px; padding: 14px 16px; border-radius: 14px; background: #FBEDEA; border: 1.5px solid var(--accent); color: #8E2616; font-size: 20px; font-weight: 700; line-height: 1.35; }
 .bd-more { margin-top: 14px; font-size: 20px; font-weight: 600; color: var(--muted); }
 .bd-empty { padding-top: 14vh; max-width: 760px; }
@@ -230,7 +244,7 @@ CSS = """
   .block-container { padding-top: 18px !important; }
   .bd-hero { margin: 2px 0 8px; } .bd-hero .num { font-size: 84px; }
   .bd-sum { margin-bottom: 14px; } .bd-sum .t { margin-bottom: 8px; } .bd-sum .cells { margin-top: 8px; }
-  .cell b { font-size: 36px; } .bd-final { margin-top: 10px; font-size: 20px; } .bd-total { margin-top: 4px; font-size: 22px; }
+  .cell b { font-size: 36px; } .bd-total { margin-top: 10px; font-size: 20px; }
   .bd-grid { gap: 10px; } .bd-card { min-height: 92px; padding: 8px 14px; } .bd-card.just { padding: 7px 13px; }
   .bd-card .pct { font-size: 32px; }
 }
@@ -263,6 +277,5 @@ def render() -> None:
         with st.container(key="bd_side"):
             url = join_url()
             if is_local(url) and not _manual_join_url():
-                st.markdown('<div class="bd-warn">Phones can\'t reach localhost: set join_url (secrets or NUDGE_JOIN_URL) '
-                            'to this computer\'s address or the hosted app.</div>', unsafe_allow_html=True)
+                st.markdown('<div class="bd-warn">Phones can\'t reach localhost. Set NUDGE_JOIN_URL.</div>', unsafe_allow_html=True)
             _qr_box(url)

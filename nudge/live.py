@@ -134,7 +134,9 @@ def summary(rows: list[dict]) -> dict:
             "left_discount": sum(r["zone"] == DISCOUNT_Z for r in left),
             "left_reminder": sum(r["zone"] == REMINDER_Z for r in left),
             "left_carts": len(carts),                                          # "discount everyone" would discount these
-            "left_carts_discounted": sum(r["zone"] == DISCOUNT_Z for r in carts)}  # what Nudge gave
+            "left_carts_discounted": sum(r["zone"] == DISCOUNT_Z for r in carts),   # what Nudge gave
+            # cart value of the leavers Nudge did NOT discount: 10% of it is what it holds back vs "discount everyone"
+            "left_held_value": sum(r["cart_value"] for r in carts if r["zone"] != DISCOUNT_Z)}
 
 
 def fill_demo(board: LiveBoard, n: int = 12) -> None:

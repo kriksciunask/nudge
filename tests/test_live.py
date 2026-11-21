@@ -92,7 +92,7 @@ def test_summary_separates_shopping_from_left():
     assert (s["shoppers"], s["shopping"], s["left"]) == (5, 2, 3)
     assert (s["discount"], s["reminder"], s["none"]) == (1, 1, 0)            # the bar counts only those still shopping
     assert (s["left_discount"], s["left_reminder"], s["left_none"]) == (1, 1, 1)
-    assert (s["left_carts"], s["left_carts_discounted"]) == (2, 1)
+    assert (s["left_carts"], s["left_carts_discounted"]) == (2, 1) and s["left_held_value"] == 80.0
 
 
 def test_demo_fill():

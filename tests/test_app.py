@@ -220,7 +220,7 @@ def test_board_shows_fake_shoppers_and_hero():
     html = board_html(at)
     assert '<span class="num">12</span>' in html and html.count('class="bd-card') == 12
     assert "9</b> shopping" in html or "shopping now" in html
-    assert "Left → " in html and "Discounts Nudge gave" in html and "Reminder + 10%" in html
+    assert "Left → " in html and "Room total appears after 5 shoppers leave with a cart" in html and "Already left" in html and "Reminder + 10%" in html
     assert any(b.key == "bd_reset" for b in at.button)       # presenter menu only with the key
 
 
@@ -236,6 +236,18 @@ def test_board_without_key_has_no_menu_and_no_backdoor():
     live_board.get_store().reset()
     at = board_app(key="wrong", demo="12", menu="1")
     assert 'class="bd-card' not in board_html(at)
+
+
+def test_room_total_after_five_leavers_with_a_cart():
+    import live_board
+    store = live_board.get_store()
+    store.reset()
+    for i in range(5):                       # 5 leavers with a cart: 2 got +10% (zone 1), 3 did not
+        store.update(f"x{i}", hist=[0.1], zone=1 if i < 2 else 2, cart_value=100.0, n_cart=1, status="left")
+    html = board_html(board_app())
+    assert "Leavers with a cart: <b>5</b>" in html and "Nudge gives <b>2</b>" in html and "€30" in html
+    assert "Room total appears" not in html and "margin" not in html.lower()
+    store.reset()
 
 
 def test_shopper_click_appears_on_board_with_nickname():
