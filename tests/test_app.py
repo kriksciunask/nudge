@@ -8,6 +8,7 @@ from streamlit.testing.v1 import AppTest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "app"))
 APP = str(ROOT / "app" / "app.py")
 
 
@@ -194,6 +195,56 @@ def test_owner_view_names_the_cost_too():
     next(b for b in at.button if b.label == "Leave the shop").click().run()
     html = owner_html_of(at)
     assert "less wasted" in html and "% left out" in html and "more shoppers got no nudge and did not come back" in html and "A/B test" in html
+
+
+def board_html(at) -> str:
+    return next(m.value for m in at.markdown if 'class="bd"' in m.value)
+
+
+def board_app(key="k", **params) -> AppTest:
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.secrets["board_key"] = "k"
+    at.query_params["board"] = "1"
+    if key:
+        at.query_params["key"] = key
+    for name, value in params.items():
+        at.query_params[name] = value
+    return at.run()
+
+
+def test_board_shows_fake_shoppers_and_hero():
+    import live_board
+    live_board.get_store().reset()
+    at = board_app(demo="12")
+    assert not at.exception, at.exception
+    html = board_html(at)
+    assert '<span class="num">12</span>' in html and html.count('class="bd-card') == 12
+    assert "Just left" in html and "Left ·" in html and "Reminder + 10%" in html
+    assert any(b.key == "bd_reset" for b in at.button)       # presenter menu only with the key
+
+
+def test_board_without_key_has_no_menu_and_no_backdoor():
+    import live_board
+    live_board.get_store().reset()
+    at = board_app(key="", demo="12")                                      # demo is ignored without the key
+    assert not at.exception, at.exception
+    assert "Scan to join" in board_html(at) and 'class="bd-card' not in board_html(at)
+    assert not any(b.key == "bd_reset" for b in at.button)
+    at = board_app(key="wrong", demo="12")
+    assert 'class="bd-card' not in board_html(at)
+
+
+def test_shopper_click_appears_on_board_with_nickname():
+    import live_board
+    live_board.get_store().reset()
+    at = fresh()
+    at.text_input(key="nick_in").set_value("Ona").run()
+    next(b for b in at.button if b.key and b.key.startswith("gv_")).click().run()
+    rows = live_board.get_store().snapshot()
+    assert len(rows) == 1 and rows[0]["nick"] == "Ona" and len(rows[0]["hist"]) == 2
+    next(b for b in at.button if b.label == "Leave the shop").click().run()
+    assert live_board.get_store().snapshot()[0]["status"] == "left"
+    live_board.get_store().reset()
 
 
 if __name__ == "__main__":

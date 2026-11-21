@@ -26,3 +26,6 @@ course/
 !results/*.csv
 !results/tuning/
 !results/tuning/*.csv
+
+# Streamlit secrets (presenter key); only the .example file is committed
+.streamlit/secrets.toml

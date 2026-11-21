@@ -19,7 +19,7 @@ git clone https://github.com/kriksciunask/nudge.git
 cd nudge
 python3.13 -m venv .venv          # or python3.12
 source .venv/bin/activate         # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt   # the demo only; notebooks and training also need: pip install -r requirements-dev.txt
 python -m streamlit run app/app.py
 ```
 
@@ -99,3 +99,16 @@ recorded with its reasons in `CLAUDE.md` and `docs/PROJECT_LOG.md`. The data rul
 We trained every model on our own data; no pre-trained model is used (the Transformer reuses only the course workshop
 code). Every number in the report comes from the files in `results/`. Every team member reviewed the code and can
 explain how it works.
+
+## Live audience board (presentation)
+
+Audience members open the hosted shop on their phones (QR code); the projector shows the presenter board.
+
+- **Open the board:** `<app url>/?board=1` (it refreshes itself every 2 seconds and shows the QR code to join).
+- **Presenter menu** (hide a shopper by nickname, reset the board): `<app url>/?board=1&key=<board_key>`. The key is
+  `board_key` in Streamlit secrets (Cloud: app menu, Settings, Secrets; local: copy `.streamlit/secrets.toml.example`
+  to `.streamlit/secrets.toml`, which is git-ignored). If no key is set the fallback is `mercato`: set your own.
+- **Rehearse alone:** add `&demo=12` (only works with the key) to fill the board with fake shoppers; Reset clears them.
+- The QR code points to the app's own address; set `join_url` in secrets to override it. Shopper data lives only in
+  server memory (nickname, chances, cart value), expires after 15 minutes idle, max 200 sessions.
+- Tests: `.venv/bin/python tests/test_live.py` and `.venv/bin/python tests/test_app.py`.

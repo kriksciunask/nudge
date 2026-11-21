@@ -22,6 +22,7 @@ import io
 import math
 import sys
 import time
+import uuid
 from pathlib import Path
 
 import pandas as pd
@@ -29,6 +30,8 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
+sys.path.insert(0, str(ROOT))   # live_board.py sits next to this file, whatever directory the server started in
+import live_board  # noqa: E402
 from nudge.contract import START_WORDS, predict, session_words  # noqa: E402
 START_WORDS_SET = set(START_WORDS)
 from nudge.explain import attention_matrix, attention_to_summary, effect_of_each, kept  # noqa: E402
@@ -205,7 +208,7 @@ div[data-testid="stColumn"]:has(.st-key-cartbox) { position: sticky; top: 16px; 
 .bz-citem { display:flex; gap:12px; align-items:center; padding: 4px 0; }
 div[class*="st-key-rm_"] button { min-height: 32px; width: 32px; padding: 0; border-radius: 8px; justify-content:center; }
 div[class*="st-key-rm_"] button:hover { background: var(--soft); text-decoration: none; }
-div[class*="st-key-rm_"] button p { position:absolute; width:1px; height:1px; overflow:hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+div[class*="st-key-rm_"] button p { position:absolute; width:1px; height:1px; overflow:hidden; clip: rect(0 0 0 0); }
 div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-citem img { width:48px; height:48px; border-radius:8px; object-fit:cover; background: var(--soft); flex:none; }
 .bz-citem .t { font-size: 13.5px; line-height:1.3; color: var(--ink); font-weight:500;
@@ -427,6 +430,8 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 }
 /* Phones: the live meter and cart come before the products (columns stack), and nothing is sticky */
 @media (max-width: 640px) {
+  /* The presenter sidebar is for the laptop; on a phone it must never cover the shop (even when the browser restores it open) */
+  [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] { display: none !important; }
   div[data-testid="stColumn"]:has(.st-key-cartbox) { order: -1; position: static; max-height: none; overflow: visible; min-width: 0; }
   .st-key-nudgebox { margin-top: 8px !important; }
   .bz-result { grid-template-columns: 1fr; gap: 16px; }
@@ -488,6 +493,9 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
   .ow-short { display: inline !important; } .ow-long { display: none; }
   .ow-cost .n { font-size: 26px; white-space: normal; } .ow-cost .n span { font-size: 15px; }
 }
+.st-key-hint { margin: 14px 0 0 0; padding: 10px 14px; background: var(--soft); border-radius: 12px; }
+.bz-hint { font-size: 15px; line-height: 1.4; color: var(--ink-2); font-weight: 500; }
+.st-key-hint [data-testid="stTextInput"] input { font-size: 15px; min-height: 38px; }
 .bz-wild { margin-top: 24px; border-top: 1px solid var(--line, #e7e5e1); padding-top: 16px; }
 .bz-wild-title { font-weight: 600; font-size: 15px; margin-bottom: 10px; }
 .bz-wild img { width: 100%; max-height: 420px; object-fit: cover; border-radius: 12px; display: block; }
@@ -496,6 +504,10 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 """,
     unsafe_allow_html=True,
 )
+
+if "board" in st.query_params:      # the presenter page (projector): ?board=1, see app/live_board.py
+    live_board.render()
+    st.stop()
 
 ICON = {  # one line-icon style (24px grid, 1.75 stroke), inline so it works offline
     "bag": '<path d="M6 7h12l1 13H5L6 7Z"/><path d="M9 7V6a3 3 0 0 1 6 0v1"/>',
@@ -939,6 +951,17 @@ def product_grid(rows: pd.DataFrame, key_prefix: str, per_row: int = 4) -> None:
 
 cart_value = float(sum(CATALOG.loc[p, "price"] for p in st.session_state.cart))
 page = st.session_state.page
+st.session_state.setdefault("sid", uuid.uuid4().hex[:10])     # this browser tab's id on the live board (no personal data)
+
+
+def share(hist: list[float], words: list[str], zone: int, status: str) -> None:
+    """Write this shopper's state to the live audience board (every rerun = every click)."""
+    live_board.publish(st.session_state.sid, hist, zone, cart_value, len(st.session_state.cart), status, words,
+                       st.session_state.get("nick"))
+
+
+def set_nick() -> None:
+    st.session_state["nick"] = st.session_state.get("nick_in", "")
 
 # --- Header ------------------------------------------------------------------------------------------
 st.markdown(f'<div class="bz-util"><div><b>Free delivery</b> over €50<span class="sep">|</span>30-day returns'
@@ -963,12 +986,19 @@ with st.container(key="hdr"):
     with st.container(key="nav"):
         cat = st.pills("Category", cats, default="All", label_visibility="collapsed", key="cat", on_change=go_shop) or "All"
 
+if page == "shop" and not st.session_state.clicks:   # first visit by QR: one line of help + optional nickname
+    with st.container(key="hint"):
+        st.markdown("<div class='bz-hint'>Shop as usual. The line shows Nudge's guess live.</div>", unsafe_allow_html=True)
+        st.text_input("Nickname (optional)", key="nick_in", max_chars=16, placeholder="Nickname (optional)",
+                      label_visibility="collapsed", on_change=set_nick)
+
 # --- Result page: full width, the number is the hero ---------------------------------------------------
 if page == "left":
     words = words_for(st.session_state.clicks)
     hist = chance_history(st.session_state.clicks)
     p = hist[-1]
     action = decide(p, generosity)
+    share(hist, words, ZONE_OF[action], "left")
     with st.container(key="lefthead"):
         t1, t2 = st.columns([7, 1.6], vertical_alignment="bottom", gap="medium")
         t1.markdown('<div class="bz-eyebrow">The shopper left without buying</div>'
@@ -1045,6 +1075,7 @@ with side:
         hist = chance_history(clicks)
         now = hist[-1]
         on = ZONE_OF[decide(now, generosity)]
+        share(hist, words, on, "bought" if page == "bought" else "shopping")
         if not clicks:
             delta = f'<span class="nm-delta">start, {"returning" if returning else "new"} visitor</span>'
         elif st.session_state.removed:
