@@ -5,7 +5,8 @@ LiveBoard (nudge/live.py), kept in st.cache_resource so every session in the ser
 
 Presenter: open  <app url>/?board=1  on the projector. It refreshes itself every 2 s (st.fragment).
 Add  &key=<board_key>&menu=1  to get the presenter menu (hide a shopper, reset the board) and  &key=...&demo=12  to fill
-the board with fake shoppers for rehearsal. board_key comes from st.secrets["board_key"] (fallback below).
+the board with fake shoppers for rehearsal. board_key comes from st.secrets["board_key"]; without it all presenter
+controls (menu, reset, hide, demo) are off.
 """
 
 import hmac
@@ -20,7 +21,6 @@ import streamlit as st
 from nudge.decision import DISCOUNT_RATE
 from nudge.live import LiveBoard, fill_demo, summary
 
-FALLBACK_KEY = "mercato"      # used only when no board_key is set in secrets; set a real one on the cloud
 QR_JS = (Path(__file__).resolve().parent / "static" / "qrcode.min.js").read_text()   # vendored qrcodejs 1.0.0 (MIT), no CDN
 JUST_LEFT_SECONDS = 8         # how long a card stays highlighted after Leave
 MAX_CARDS = 20
@@ -52,8 +52,10 @@ def _secret(name: str, default: str = "") -> str:
 
 
 def presenter_ok() -> bool:
+    """True only when a board_key secret exists AND the URL carries the same key. No secret = controls disabled."""
+    expected = _secret("board_key")
     given = str(st.query_params.get("key", ""))
-    return bool(given) and hmac.compare_digest(given, _secret("board_key", FALLBACK_KEY))
+    return bool(expected) and bool(given) and hmac.compare_digest(given, expected)
 
 
 def _manual_join_url() -> str:
@@ -108,7 +110,7 @@ def _card(r: dict, now: float) -> str:
         cls, line = "", name
     cart = f'<span class="cart" title="Has a cart">{BAG}€{r["cart_value"]:.0f}</span>' if r["n_cart"] and r["cart_value"] else ""
     return (f'<div class="bd-card z{r["zone"]} {cls}"><div class="r1"><b>{html.escape(r["nick"])}</b>{cart}</div>'
-            f'<div class="r2"><span class="pct">{round(r["chance"] * 100)}<sup>%</sup></span>{_spark(r["hist"], r["zone"])}</div>'
+            f'<div class="r2"><span class="pct"><em>Intent</em>{round(r["chance"] * 100)}<sup>%</sup></span>{_spark(r["hist"], r["zone"])}</div>'
             f'<div class="r3"><i></i>{html.escape(line)}</div></div>')
 
 
@@ -121,7 +123,7 @@ def _card_small(r: dict, now: float, grp: str = "") -> str:
     if r["status"] == "bought":
         cls = "bought"
     return (f'<div class="bd-card c {grp} z{r["zone"]} {cls}"><div class="r1"><b>{html.escape(r["nick"])}</b>'
-            f'<span class="pct">{round(r["chance"] * 100)}<sup>%</sup></span></div>'
+            f'</div><div class="r2"><span class="pct"><em>Intent</em>{round(r["chance"] * 100)}<sup>%</sup></span></div>'
             f'<div class="r3"><i></i>{html.escape(line)}</div></div>')
 
 
@@ -152,8 +154,8 @@ def _body(rows: list[dict], now: float) -> str:
         extra = [f"+{len(now_rows) - cn} more shopping"] if len(now_rows) > cn else []
         extra += [f"+{len(left_rows) - cl} more left"] if len(left_rows) > cl else []
         return " · ".join(extra)
-    # on narrower screens CSS shows fewer compact cards (12 shopping, 4 left), so that text has its own counts
-    wide, narrow = more_text(cap_now, cap_left), more_text(12 if compact else cap_now, 4 if compact else cap_left)
+    # on narrower screens CSS shows fewer compact cards (8 shopping, 4 left), so that text has its own counts
+    wide, narrow = more_text(cap_now, cap_left), more_text(8 if compact else cap_now, 4 if compact else cap_left)
     more = (f'<div class="bd-more"><span class="wide">{wide}</span><span class="narrow">{narrow}</span></div>'
             if (wide or narrow) else "")
     if s["left_carts"] >= 5:
@@ -169,7 +171,7 @@ def _body(rows: list[dict], now: float) -> str:
     return (f'<div class="bd-eyebrow"><i></i>Nudge · live audience board</div>'
             f'<div class="bd-herorow"><div class="bd-hero"><span class="num">{s["shoppers"]}</span><span class="lab">joined · '
             f'<b>{s["shopping"]}</b> shopping now</span></div>{room}</div>'
-            f'<div class="bd-sum"><div class="t">If they left this second, Nudge would send <span><span class="sw"></span>hatched = already left, final</span></div>'
+            f'<div class="bd-sum"><div class="t">Suggested actions if they left now <span><span class="sw"></span>hatched = already left, final</span></div>'
             f'<div class="bar" role="img" aria-label="Nudge decisions across the room">{segs}</div>'
             f'<div class="cells">{cells}</div>'
             f'<div class="bd-total">{total}</div></div>'
@@ -242,11 +244,13 @@ CSS = """
 .bd-held span { font-size: 20px; font-weight: 700; line-height: 1.25; color: var(--ink-2); }
 .bd-grid.c { grid-template-columns: repeat(auto-fill, minmax(214px, 1fr)); gap: 10px; }
 .bd-card.c { min-height: 0; padding: 8px 12px; gap: 2px; }
+.bd-card.c .pct em { display: inline; margin: 0 8px 0 0; } .bd-card.c .r2 { justify-content: flex-start; }
+.bd-ctl-off { margin-top: 18px; font-size: 18px; color: var(--faint); }
 .bd-card.c .r1 { align-items: baseline; } .bd-card.c .pct { font-size: 28px; } .bd-card.c .pct sup { font-size: 16px; }
 .bd-card.c.just { padding: 7px 11px; }
 .bd-more .narrow { display: none; }
 @media (max-width: 1600px) {
-  .bd-grid.c > .act:nth-child(n+13) { display: none; }
+  .bd-grid.c > .act:nth-child(n+9) { display: none; }
   .bd-grid.c > .bd-sep + .lft + .lft + .lft + .lft ~ .lft { display: none; }
   .bd-more .wide { display: none; } .bd-more .narrow { display: inline; }
 }
@@ -267,6 +271,7 @@ CSS = """
 .bd-card .r1 b { font-size: 19px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow:hidden; text-overflow: ellipsis; }
 .bd-card .cart { display:flex; align-items:center; gap:4px; font-size: 18px; font-weight:600; color: var(--muted); flex: none; }
 .bd-card .r2 { display:flex; justify-content:space-between; align-items:center; }
+.bd-card .pct em { display: block; font-style: normal; font-size: 18px; font-weight: 600; letter-spacing: 0; color: var(--muted); margin-bottom: 2px; }
 .bd-card .pct { font-size: 40px; font-weight: 800; letter-spacing:-.04em; line-height:1; }
 .bd-card .pct sup { font-size: 20px; font-weight: 600; letter-spacing:0; margin-left:1px; vertical-align: baseline; position: relative; top: -.55em; }
 .bd-card .sp { flex:none; overflow: visible; }
@@ -316,6 +321,8 @@ def render() -> None:
     with st.container(key="bd"):
         with st.container(key="bd_main"):
             _live()
+            if not _secret("board_key"):
+                st.markdown('<div class="bd-ctl-off">presenter controls off: set board_key</div>', unsafe_allow_html=True)
             if menu:
                 with st.container(key="bd_ctl"):
                     with st.popover("Presenter", icon=":material/tune:"):

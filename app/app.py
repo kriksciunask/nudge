@@ -231,7 +231,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-nudge-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 8px 0; }
 
 /* --- Live meter: the chance after every click (every part has a fixed height, so nothing jumps) --- */
-.nm-label { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-top: 10px; }
+.nm-label { font-size: 17px; font-weight: 700; color: var(--ink); margin-top: 10px; }
 .nm-sub { font-size: 14px; line-height: 1.4; color: var(--muted); min-height: 2.8em; margin-top: 2px; }
 .nm-hero-row { display:flex; align-items:baseline; gap: 10px; height: 62px; }
 .nm-hero { font-size: 58px; font-weight: 800; line-height: 1; letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -280,7 +280,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .nm-chart.big .nm-svg path { stroke-width: 3; }
 .nm-act { margin-top: 12px; }
 .nm-act small { display:block; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-.nm-act b { display:flex; align-items:center; gap: 9px; font-size: 19px; font-weight: 800; letter-spacing: -.01em; line-height: 1.3; white-space: nowrap; }
+.nm-act b { display:flex; align-items:center; gap: 9px; font-size: 16px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; white-space: nowrap; }
 .nm-act i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .nm-act.z0 b { color: var(--ink-2); } .nm-act.z0 i { background: var(--muted); }
 .nm-act.z1 b { color: var(--accent); } .nm-act.z1 i { background: var(--accent); }
@@ -304,6 +304,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-card { border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px; }
 .bz-hero-label { color: var(--muted); font-size: 16px; line-height:1.5; }
 .bz-hero-label b { color: var(--ink); }
+.bz-hero-label b.k { font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
 .bz-hero { font-size: 104px; font-weight: 800; color: var(--ink); line-height: .95; letter-spacing: -.06em; font-variant-numeric: tabular-nums;
   margin: 4px 0 8px -4px; }
 .bz-hero sup { font-size: .42em; vertical-align: top; position: relative; top: .18em; margin-left: 4px; letter-spacing:0; color: var(--muted); }
@@ -448,6 +449,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 /* --- Owner view (leave page): the money, one hero number --------------------------------------- */
 .st-key-owner { margin-top: 40px; border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px 24px 32px; }
 .st-key-owner [data-testid="stSlider"] { max-width: 520px; }
+.ow-tools { margin: -6px 0 14px 0; font-size: 15px; line-height: 1.45; color: var(--muted); max-width: 760px; }
 .ow-title { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--ink); margin: 6px 0 14px 0; line-height: 1.2; }
 .ow-read { font-size: 16px; color: var(--ink); margin: -4px 0 8px 0; } .ow-read b { font-weight: 800; }
 .ow-zones { color: var(--muted); font-size: 14px; margin: -6px 0 0 0; }
@@ -494,6 +496,8 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
   .ow-short { display: inline !important; } .ow-long { display: none; }
   .ow-cost .n { font-size: 26px; white-space: normal; } .ow-cost .n span { font-size: 15px; }
 }
+.st-key-scrolltop { position: absolute; width: 1px; height: 1px; overflow: hidden; }
+.st-key-scrolltop iframe { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .st-key-hint { margin: 14px 0 0 0; padding: 10px 14px; background: var(--soft); border-radius: 12px; }
 .bz-hint { font-size: 15px; line-height: 1.4; color: var(--ink-2); font-weight: 500; }
 .st-key-hint [data-testid="stTextInput"] input { font-size: 15px; min-height: 38px; }
@@ -832,6 +836,7 @@ def log(event: str, pid: str) -> None:
         st.session_state.clicks.append({"event": "view", "product_id": pid, "price": price, "time": now})
         now += 1
     st.session_state.clicks.append({"event": event, "product_id": pid, "price": price, "time": now})
+    st.session_state["scroll_top"] = True     # phones: bring the meter back into view (see scroll_to_top below)
 
 
 def open_product(pid: str) -> None:
@@ -987,6 +992,14 @@ with st.container(key="hdr"):
     with st.container(key="nav"):
         cat = st.pills("Category", cats, default="All", label_visibility="collapsed", key="cat", on_change=go_shop) or "All"
 
+if st.session_state.pop("scroll_top", False):
+    # After a click on a phone (<= 640 px) the page would stay scrolled down the product list, away from the meter:
+    # a zero-height iframe scrolls the app back to the top. Desktop keeps its scroll position.
+    with st.container(key="scrolltop"):
+      st.iframe(f"""<script>/* {time.time()} */ try {{ var w = window.parent;
+      if (w.innerWidth <= 640) {{ w.document.querySelectorAll('[data-testid="stMain"], section.main, .stMain').forEach(function (e) {{ e.scrollTo(0, 0); }}); w.scrollTo(0, 0); }}
+    }} catch (e) {{}}</script>""", height=1)
+
 if page == "shop" and not st.session_state.clicks:   # first visit by QR: one line of help + optional nickname
     with st.container(key="hint"):
         st.markdown("<div class='bz-hint'>Shop as usual. Nudge guesses if you'd come back and buy: watch your card on the big screen.</div>", unsafe_allow_html=True)
@@ -1034,9 +1047,9 @@ if page == "left":
         chat = f'<div class="bz-day">Today</div><div class="bz-bubble msg">{pic}<p>{text}</p><small>{time.strftime("%H:%M")}</small></div>'
     st.markdown(
         f'<div class="bz-result"><div class="bz-card">'
-        f'<div class="bz-top"><div><div class="bz-hero-label">Chance they come back and buy on their own within 7 days '
+        f'<div class="bz-top"><div><div class="bz-hero-label"><b class="k">Purchase intent</b><br>chance they come back and buy on their own within 7 days '
         f'<b>without any message</b></div><div class="bz-hero">{pct(p)}<sup>%</sup></div></div>'
-        f'<div class="bz-decision"><small>So Nudge sends</small><div class="d">{verdict}</div><div class="why">{why}</div>{money}</div></div>'
+        f'<div class="bz-decision"><small>Suggested action</small><div class="d">{verdict}</div><div class="why">{why}</div>{money}</div></div>'
         f'<div class="bz-story"><small>The chance after each click</small>{story}</div>'
         f'<div class="bz-seen"><small>What Nudge saw</small><div class="bz-chips">{chips(words)}</div></div>'
         f'</div><div class="bz-phonecol"><div class="bz-phone"><div class="bz-phone-top"><div class="bz-ava">m</div><div><b>{SHOP}</b>'
@@ -1046,7 +1059,9 @@ if page == "left":
     if curve is not None:
         with st.container(key="owner"):
             st.markdown('<div class="bz-eyebrow" style="margin-top:0">For the shop owner</div>'
-                        '<div class="ow-title">What the discounts cost you</div>', unsafe_allow_html=True)
+                        '<div class="ow-title">What the discounts cost you</div>'
+                        '<p class="ow-tools">Your tools (Hostinger Reach, Klaviyo, Gupshup…) can use the intent score as a condition. '
+                        'The slider is one example policy.</p>', unsafe_allow_html=True)
             st.session_state["gen_main"] = st.session_state["gen_side"]
             st.slider("How generous with discounts?", 0, 100, step=5, key="gen_main",
                       on_change=lambda: st.session_state.update(gen_side=st.session_state["gen_main"]))
@@ -1091,11 +1106,11 @@ with side:
                 f'<div class="bz-chips">{chips(words, last=4)}</div></div>') if show_words else ""
         st.markdown(
             f'<div class="bz-nudge-title"><i></i>Nudge · live</div>'
-            f'<div class="nm-label">If they left now</div>'
+            f'<div class="nm-label">Purchase intent</div>'
             f'<div class="nm-hero-row"><span class="nm-hero">{pct(now)}<span class="pc">%</span></span>{delta}</div>'
             f'<div class="nm-sub">chance they come back and buy on their own within 7 days</div>'
             + chance_chart(hist, low, high)
-            + f'<div class="nm-act z{on}"><small>Nudge would send</small><b><i></i>{ACTION_LINE[on]}</b></div>'
+            + f'<div class="nm-act z{on}"><small>Suggested action</small><b><i></i>{ACTION_LINE[on]}</b></div>'
             f'<div class="nm-why">{esc(why_line(words))}</div>' + seen,
             unsafe_allow_html=True)
     with st.container(key="cartbox"):

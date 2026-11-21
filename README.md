@@ -107,7 +107,7 @@ Audience members open the hosted shop on their phones (QR code); the projector s
 - **Open the board:** `<app url>/?board=1` (it refreshes itself every 2 seconds and shows the QR code to join).
 - **Presenter menu** (hide a shopper by nickname, reset the board): `<app url>/?board=1&key=<board_key>&menu=1` (the menu stays off the projector unless both `key` and `menu=1` are given). The key is
   `board_key` in Streamlit secrets (Cloud: app menu, Settings, Secrets; local: copy `.streamlit/secrets.toml.example`
-  to `.streamlit/secrets.toml`, which is git-ignored). If no key is set the fallback is `mercato`: set your own.
+  to `.streamlit/secrets.toml`, which is git-ignored). There is no fallback key: without a `board_key` secret the menu, reset, hide and `&demo=` are all disabled and the board shows "presenter controls off: set board_key".
 - **Rehearse alone:** add `&demo=12` (only works with the key) to fill the board with fake shoppers; Reset clears them.
 - The QR code points to the app's own address (a red banner warns if that is localhost); set `join_url` in secrets or `NUDGE_JOIN_URL` to override it. qrcodejs (MIT) is vendored in `app/static/`, so the QR needs no internet. Shopper data lives only in
   server memory (nickname, chances, cart value), expires after 15 minutes idle, max 200 sessions.

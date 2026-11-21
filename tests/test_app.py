@@ -78,7 +78,7 @@ def test_history_controls_change_words_and_chance():
 def test_panel_copy_and_chips():
     at = fresh()
     html = panel(at)
-    assert "Nudge would send</small><b><i></i>No message</b>" in html and "New visitor, nothing clicked yet." in html
+    assert "Suggested action</small><b><i></i>No message</b>" in html and "New visitor, nothing clicked yet." in html
     next(b for b in at.button if b.key and b.key.startswith("gv_")).click().run()     # view 1 (product page)
     for _ in range(2):                                                                # views 2-3 from "You might also like"
         next(b for b in at.button if b.key and b.key.startswith("sv_")).click().run()
@@ -201,9 +201,9 @@ def board_html(at) -> str:
     return next(m.value for m in at.markdown if 'class="bd"' in m.value)
 
 
-def board_app(key="k", **params) -> AppTest:
+def board_app(key="k", secret="k", **params) -> AppTest:
     at = AppTest.from_file(APP, default_timeout=60)
-    at.secrets["board_key"] = "k"
+    at.secrets["board_key"] = secret
     at.query_params["board"] = "1"
     if key:
         at.query_params["key"] = key
@@ -236,6 +236,25 @@ def test_board_without_key_has_no_menu_and_no_backdoor():
     live_board.get_store().reset()
     at = board_app(key="wrong", demo="12", menu="1")
     assert 'class="bd-card' not in board_html(at)
+
+
+def test_no_board_key_secret_disables_all_presenter_controls():
+    import live_board
+    live_board.get_store().reset()
+    for key in ("mercato", "k", ""):                     # no fallback key: whatever the URL says, nothing works
+        at = board_app(key=key, secret="", demo="12", menu="1")
+        assert not at.exception, at.exception
+        html = board_html(at)
+        assert 'class="bd-card' not in html and not any(b.key == "bd_reset" for b in at.button)
+        assert any("presenter controls off: set board_key" in m.value for m in at.markdown)
+
+
+def test_board_cards_lead_with_intent():
+    import live_board
+    live_board.get_store().reset()
+    html = board_html(board_app(demo="12"))
+    assert "<em>Intent</em>" in html and "Suggested actions if they left now" in html
+    live_board.get_store().reset()
 
 
 def test_room_total_after_five_leavers_with_a_cart():
