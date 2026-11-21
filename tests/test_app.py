@@ -116,7 +116,7 @@ def test_leave_page_look_inside():
     rows = re.findall(r'class="bz-in-row[^"]*"', text)
     assert len(rows) == len(words_on_leave(at))                       # one row per word the model read
     widths = [float(x) for x in re.findall(r'class="fill" style="width:([\d.]+)%', text)]
-    assert max(widths) == 100.0 and "softmax(QK" in text and "chance if removed" in text
+    assert max(widths) == 100.0 and "softmax(QK" in text and "Effect of this click" in text and "Chance now" in text
     assert any("Full attention grid" in e.label for e in at.expander)
 
 

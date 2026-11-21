@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from nudge.contract import BLOCK_SIZE, predict  # noqa: E402
-from nudge.explain import attention_matrix, attention_to_summary, kept, without_each  # noqa: E402
+from nudge.explain import attention_matrix, attention_to_summary, kept, effect_of_each  # noqa: E402
 
 VISIT = ["returning", "visits_5plus", "last_today", "view_cheap_start", "view_expensive_again_quick",
          "cart_expensive_again_quick"]
@@ -20,18 +20,18 @@ def test_weights_sum_to_one_and_match_words():
 
 def test_one_word_visit():
     assert attention_to_summary(["new"]) == [1.0] or abs(attention_to_summary(["new"])[0] - 1) < 1e-6
-    assert without_each(["new"]) == [None]
+    assert effect_of_each(["new"]) == [None]
 
 
 def test_start_and_history_words_cannot_be_removed():
-    d = without_each(VISIT)
+    d = effect_of_each(VISIT)
     assert len(d) == len(VISIT) and d[:3] == [None, None, None]
     assert all(isinstance(x, float) for x in d[3:])
 
 
 def test_leave_one_out_matches_predict():
-    d = without_each(VISIT)
-    expected = 100 * (predict(VISIT[:5]) - predict(VISIT))     # drop the last click
+    d = effect_of_each(VISIT)
+    expected = 100 * (predict(VISIT) - predict(VISIT[:5]))     # chance with the last click minus without it
     assert abs(d[5] - expected) < 1e-9
 
 
@@ -41,7 +41,7 @@ def test_long_visit_is_cut_like_predict():
     assert len(k) == BLOCK_SIZE and k[0] == "new"
     assert len(attention_to_summary(long)) == BLOCK_SIZE
     assert attention_matrix(long).shape == (BLOCK_SIZE, BLOCK_SIZE)
-    assert len(without_each(long)) == BLOCK_SIZE
+    assert len(effect_of_each(long)) == BLOCK_SIZE
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
 from nudge.contract import START_WORDS, predict, session_words  # noqa: E402
 START_WORDS_SET = set(START_WORDS)
-from nudge.explain import attention_matrix, attention_to_summary, kept, without_each  # noqa: E402
+from nudge.explain import attention_matrix, attention_to_summary, effect_of_each, kept  # noqa: E402
 from nudge.decision import DISCOUNT, DISCOUNT_RATE, NOTHING, REMINDER, cutoffs, decide  # noqa: E402
 
 SHOP = "Mercato"
@@ -351,9 +351,11 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 
 /* --- Look inside the model (leave page) ------------------------------------------------------- */
 .bz-inside { margin-top: 40px; border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px 24px 32px; }
+.bz-in-take { font-size: 20px; line-height: 1.5; font-weight: 500; color: var(--ink); margin: 12px 0 8px 0; max-width: 900px; }
+.bz-in-take b { font-weight: 800; }
 .bz-in-title { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--ink); margin: 6px 0 4px 0; line-height: 1.2; }
 .bz-in-sub { color: var(--muted); font-size: 16px; line-height: 1.5; margin: 0 0 20px 0; max-width: 760px; }
-.bz-in-head, .bz-in-row { display: grid; grid-template-columns: 28px minmax(220px, 1.15fr) minmax(0, 1.5fr) 170px; gap: 8px 20px; align-items: center; }
+.bz-in-head, .bz-in-row { max-width: 1000px; display: grid; grid-template-columns: 28px minmax(250px, 1.2fr) minmax(0, 1fr) 230px; gap: 8px 20px; align-items: center; }
 .bz-in-head { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding-bottom: 10px;
   border-bottom: 1px solid var(--line); }
 .bz-in-head .dl, .bz-in-row .dl { text-align: right; }
@@ -365,15 +367,15 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-tag { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
   white-space: nowrap; }
 .bz-tag.look { background: var(--accent-soft); color: #9C2C1B; }
-.bz-tag.move { background: var(--ink); color: #fff; }
+.bz-tag.move { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
 .bz-in-row .bar { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .bz-in-row .track { flex: 1; height: 14px; border-radius: 7px; background: var(--soft); overflow: hidden; }
 .bz-in-row .fill { height: 100%; border-radius: 7px; background: #A9AEB5; min-width: 3px; transform-origin: left; animation: bz-grow .6s cubic-bezier(.2,.7,.2,1) both; }
 .bz-in-row.top .fill { background: var(--accent); }
 .bz-in-row .val { width: 44px; text-align: right; font-size: 16px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.bz-in-row .dl { text-align: right; font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bz-in-row .dl { display: flex; justify-content: flex-end; align-items: center; gap: 10px; text-align: right; font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bz-in-row .dl.none { color: var(--muted); font-weight: 500; }
-.bz-in-row .dl.na { color: var(--line-2); font-weight: 500; }
+.bz-in-row .dl.na { color: var(--muted); font-weight: 400; font-size: 14px; }
 .bz-in-row .dl small { display: none; text-transform: none; font-weight: 500; color: var(--muted); font-size: 13px; }
 @keyframes bz-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .bz-in-row .fill { animation: none; } }
@@ -383,14 +385,17 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-in-more { font-family: var(--mono) !important; }
 .bz-in-more { color: var(--muted); font-size: 13px; padding: 8px 0 0 0; }
 .bz-grid-wrap { overflow-x: auto; padding-bottom: 4px; }
-.bz-grid { border-collapse: separate; border-spacing: 3px; font-variant-numeric: tabular-nums; }
+.bz-grid-box { position: relative; }
+.bz-swipe { display: none; }
+.bz-grid { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
 .bz-grid th, .bz-grid td { border: none !important; }
 .bz-grid th { font-size: 14px; font-weight: 600; color: var(--ink-2); text-align: left; white-space: nowrap; padding: 0 12px 0 0; }
 .bz-grid th.c { text-align: center; padding: 0; color: var(--muted); font-weight: 700; }
 .bz-grid th .n { display: inline-block; width: 22px; color: var(--faint); font-weight: 600; }
-.bz-grid td { width: 40px; height: 36px; min-width: 40px; text-align: center; font-size: 13px; font-weight: 600; border-radius: 6px; background: var(--soft); color: var(--ink); }
+.bz-grid td { width: 40px; height: 36px; min-width: 40px; text-align: center; font-size: 13px; font-weight: 600; background: var(--soft); color: var(--ink); box-shadow: inset 0 0 0 2px #fff; }
 .bz-grid tr.used th { color: var(--accent); }
-.bz-grid tr.used td { box-shadow: 0 0 0 1.5px var(--ink); }
+.bz-grid tr.used td { border-top: 1.5px solid var(--accent) !important; border-bottom: 1.5px solid var(--accent) !important; }
+.bz-grid tr.used td:nth-child(2) { border-left: 1.5px solid var(--accent) !important; } .bz-grid tr.used td:last-child { border-right: 1.5px solid var(--accent) !important; }
 .bz-grid-cap { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 12px 0 0 0; }
 .st-key-gridbox { margin-top: 12px; }
 .st-key-gridbox [data-testid="stExpander"] { border: 1px solid var(--line); border-radius: 14px; }
@@ -398,11 +403,13 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 @media (max-width: 640px) {
   .bz-inside { padding: 20px 16px 18px 16px; margin-top: 24px; border-radius: 16px; }
   .bz-in-title { font-size: 22px; }
+  .bz-swipe { display: block; color: var(--muted); font-size: 14px; margin: 6px 0 10px 0; }
+  .bz-grid-box::after { content: ''; position: absolute; top: 0; right: 0; bottom: 4px; width: 36px; background: linear-gradient(to right, rgba(255,255,255,0), #fff); pointer-events: none; }
   .bz-grid .lab { display: none; } .bz-grid td { width: 30px; min-width: 30px; height: 32px; font-size: 12px; } .bz-grid th .n { width: 18px; }
   .bz-in-head { display: none; }
-  .bz-in-row { grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: "n w w" ". bar dl"; gap: 8px 12px; padding: 10px 0; }
+  .bz-in-row { grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: "n w w" ". bar bar" ". dl dl"; gap: 4px 12px; padding: 10px 0; }
   .bz-in-row .n { grid-area: n; } .bz-in-row .w { grid-area: w; } .bz-in-row .bar { grid-area: bar; } .bz-in-row .dl { grid-area: dl; }
-  .bz-in-row .dl { text-align: right; min-width: 92px; } .bz-in-row .dl.na { visibility: hidden; } .bz-in-legend { display: block; }
+  .bz-in-row .dl { justify-content: flex-start; } .bz-in-legend { display: block; }
 }
 
 /* Narrow laptops: keep everything inside the screen */
@@ -527,15 +534,15 @@ def pct(p: float) -> int:
 # --- Look inside the model: attention (where it looked) and leave-one-out (what changes the answer) ------
 @st.cache_data(max_entries=500, show_spinner=False)
 def look_inside(words: tuple[str, ...]):
-    """(attention to the summary position per word, change in points without each click, word x word grid)."""
+    """(attention to the summary position per word, effect of each click in points, word x word grid)."""
     w = list(words)
-    return attention_to_summary(w), without_each(w), attention_matrix(w).tolist()
+    return attention_to_summary(w), effect_of_each(w), attention_matrix(w).tolist()
 
 
 MAX_ROWS, MAX_GRID = 16, 12
 
 
-def inside_html(words: list[str]) -> tuple[str, str]:
+def inside_html(words: list[str], p: float) -> tuple[str, str]:
     """The "Look inside" section (rows) and the full attention grid, both as HTML."""
     words = kept(words)
     att, delta, grid = look_inside(tuple(words))
@@ -543,26 +550,37 @@ def inside_html(words: list[str]) -> tuple[str, str]:
     moves = [i for i, d in enumerate(delta) if d is not None and abs(d) >= 1]
     biggest = max(moves, key=lambda i: abs(delta[i])) if moves else None
     scale = max(att)
+    quote = lambda i: f"“{esc(word_label(words[i]))}”"   # noqa: E731
+    if biggest is None:
+        fact = ("Looked at most ≠ mattered most: no single click moves the chance by more than 1 pt." if any(d is not None for d in delta)
+                else "There is no click to test yet.")
+        look = f"The model looked hardest at {quote(top)}."
+    else:
+        d = delta[biggest]
+        fact = f'Biggest effect: {quote(biggest)} {"raised" if d > 0 else "lowered"} it by {abs(round(d))} pts.'
+        look = ("The model also looked hardest at it." if top == biggest else
+                f"The model looked hardest at {quote(top)}" + ("." if delta[top] is not None else ", which can't be removed."))
+    takeaway = f'<p class="bz-in-take">Chance now <b>{pct(p)}%</b>. {fact} {look}</p>'
     order = list(range(len(words))) if len(words) <= MAX_ROWS else [0] + list(range(len(words) - (MAX_ROWS - 1), len(words)))
     rows = ""
     for i in order:
         d = delta[i]
         if d is None:
-            cell = '<div class="dl na">—</div>'
+            cell = '<div class="dl na">can\'t remove</div>'
         elif abs(d) < 1:
             cell = '<div class="dl none">≈ no change</div>'
         else:
-            cell = (f'<div class="dl">{"▲ +" if d > 0 else "▼ −"}{abs(round(d))} pts</div>')
-        tags = ('<span class="bz-tag look">Looked at most</span>' if i == top else "") + \
-               ('<span class="bz-tag move">Biggest effect</span>' if i == biggest else "")
+            cell = (f'<div class="dl">{'<span class="bz-tag move">Biggest effect</span>' if i == biggest else ""}'
+                    f'<span>{"▲ +" if d > 0 else "▼ −"}{abs(round(d))} pts</span></div>')
+        tags = '<span class="bz-tag look">Looked at most</span>' if i == top else ""
         rows += (f'<div class="bz-in-row{" top" if i == top else ""}"><div class="n">{i + 1}</div>'
                  f'<div class="w">{chip(words[i], ctx=i == 0 or words[i] in WORD_FULL)}{tags}</div>'
                  f'<div class="bar"><div class="track"><div class="fill" style="width:{att[i] / scale * 100:.1f}%"></div></div>'
-                 f'<div class="val">{round(att[i] * 100)}%</div></div>{cell}</div>')
+                 f'<div class="val">{round(att[i] * 100)}</div></div>{cell}</div>')
     hidden = len(words) - len(order)
     more = f'<div class="bz-in-more">{hidden} earlier word{"" if hidden == 1 else "s"} not shown (the model read them all).</div>' if hidden else ""
-    head = ('<div class="bz-in-head"><div></div><div>Word, in order</div><div>How much the summary looked at it</div>'
-            '<div class="dl">Chance if removed</div></div>')
+    head = ('<div class="bz-in-head"><div></div><div>Word, in order</div><div>Share of attention (out of 100)</div>'
+            '<div class="dl">Effect of this click</div></div>')
     # full grid: last MAX_GRID words; rows = who is looking, columns = looked at
     g0 = max(0, len(words) - MAX_GRID)
     gw = words[g0:]
@@ -574,16 +592,16 @@ def inside_html(words: list[str]) -> tuple[str, str]:
                        f'{round(v * 100) if v >= .1 else ""}</td>')(grid[g0 + a][g0 + b]) for b in range(len(gw)))
         body += (f'<tr{" class=used" if g0 + a == 0 else ""}><th scope="row"><span class="n">{g0 + a + 1}</span><span class="lab">{esc(word_label(w))}</span></th>{cells}</tr>')
     cut = (f'<p class="bz-grid-cap">Showing the last {len(gw)} words ({len(words) - len(gw)} earlier not shown).</p>' if g0 else "")
-    gridhtml = (f'<div class="bz-grid-wrap"><table class="bz-grid"><thead><tr><th></th>{cols}</tr></thead><tbody>{body}</tbody></table></div>'
+    gridhtml = (f'<div class="bz-grid-box"><div class="bz-grid-wrap"><table class="bz-grid"><thead><tr><th></th>{cols}</tr></thead><tbody>{body}</tbody></table></div></div>'
+                f'<p class="bz-swipe">Swipe to see all {len(gw)} words</p>'
                 f'<p class="bz-grid-cap">Each row shows where that word looks (the row adds to 100%). Darker = more attention. '
                 f'Only row 1, the summary word, feeds the answer. Numbers match the rows above.</p>{cut}')
     if g0:   # row 1 is cut off: say so rather than outline a row that is not there
         gridhtml = gridhtml.replace(" class=used", "")
     section = (f'<div class="bz-inside"><div class="bz-eyebrow" style="margin-top:0">Look inside the model</div>'
                f'<div class="bz-in-title">Where the model looked in this visit</div>'
-               f'<p class="bz-in-sub">Nudge reads the visit word by word and sums it up in its first word. The bars show how much it looked at each word.</p>'
-               f'{head}<div class="bz-in-legend">Bar: how much the summary looked at the word. Right: chance if that click were removed.</div>{rows}{more}'
-               f'<p class="bz-in-note">Attention shows where the model looked. The "chance if removed" column shows what actually changes the answer.</p>'
+               f'{takeaway}<p class="bz-in-sub">The answer is read from the position of the first word. By the last block, that position has read every word. The bars show how much it looks at each one.</p>'
+               f'{head}<div class="bz-in-legend">Bar: share of attention, out of 100. Right: effect of that click on the chance.</div>{rows}{more}'
                f'<p class="bz-in-course">Attention = softmax(QK<sup>T</sup>/√d)·V, last of 3 blocks, averaged over 2 heads and 3 seeds. Summary = first position, like &lt;cls&gt;.</p>'
                f'</div>')
     return section, gridhtml
@@ -869,7 +887,7 @@ if page == "left":
         f'</div><div class="bz-phonecol"><div class="bz-phone"><div class="bz-phone-top"><div class="bz-ava">m</div><div><b>{SHOP}</b>'
         f'<small>Message preview · WhatsApp-style</small></div></div><div class="bz-chat">{chat}</div></div>'
         f'</div></div>', unsafe_allow_html=True)
-    section, gridhtml = inside_html(words)
+    section, gridhtml = inside_html(words, p)
     st.markdown(section, unsafe_allow_html=True)
     with st.container(key="gridbox"):
         with st.expander("Full attention grid (word × word)"):

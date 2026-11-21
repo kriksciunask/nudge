@@ -3,7 +3,7 @@
 Two different questions, kept apart on purpose (Jain & Wallace 2019, "Attention is not Explanation"):
 1. WHERE THE MODEL LOOKED: the attention weights softmax(QK^T / sqrt(d)) of the last block (Week 8 slide 20),
    read at the first position, the <cls>-style summary (Week 8 slide 31). Averaged over 2 heads and 3 seeds.
-2. WHAT CHANGES THE ANSWER: leave one click out, score the visit again, and see how the chance moves.
+2. WHAT CHANGES THE ANSWER: leave one click out, score the visit again; the effect of the click = chance with it minus chance without it.
    This is the honest check: it measures the output, not the inside.
 
 All functions take the same list of words as predict() (nudge/contract.py) and cut long visits the same way
@@ -43,9 +43,10 @@ def attention_to_summary(words: list[str]) -> list[float]:
     return [float(w) for w in _last_block_attention(words)[0]]
 
 
-def without_each(words: list[str]) -> list[float | None]:
-    """Change in the chance, in percentage points, if that single CLICK word were removed (leave-one-out).
-    None for words that are not clicks: the start word and the history words cannot be removed."""
+def effect_of_each(words: list[str]) -> list[float | None]:
+    """Effect of each CLICK on the chance, in percentage points: chance with it minus chance without it (leave-one-out).
+    Positive = that click raised the chance, like the live meter's up arrow. None for words that are not clicks:
+    the start word and the history words cannot be removed."""
     words = kept(words)
     base = predict(words)
     out: list[float | None] = []
@@ -53,5 +54,5 @@ def without_each(words: list[str]) -> list[float | None]:
         if i == 0 or not word.startswith(("view_", "cart_")):
             out.append(None)
         else:
-            out.append(100 * (predict(words[:i] + words[i + 1:]) - base))
+            out.append(100 * (base - predict(words[:i] + words[i + 1:])))
     return out
