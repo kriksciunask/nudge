@@ -23,11 +23,11 @@ Who has this problem: the small shops and e-shops that make up most Hostinger we
 
 ## 2. The idea
 
-Nudge is the decision layer that today's flows are missing. It has two parts.
+Nudge gives every shopper who leaves without buying a **purchase-intent score**: the chance they come back and buy within 7 days *on their own*. The score is the product. What a shop does with it is a business choice, and the score can be used as a condition inside tools shops already run (Hostinger Reach, Klaviyo, Gupshup). We show one example policy.
 
-**1. A prediction.** When a shopper leaves without buying, a sequence model reads their clicks in order and outputs one number: the chance they come back and buy within 7 days *on their own*.
+**1. The intent score.** A sequence model reads the visit's clicks in order and outputs that one number. It is calibrated well enough to read as a chance (see section 7 for the decile check).
 
-**2. A decision.** That chance is turned into one of three actions (`nudge/decision.py`):
+**2. One example policy.** The score is turned into one of three suggested actions (`nudge/decision.py`):
 
 | Chance to come back alone | Action | Why |
 | --- | --- | --- |
@@ -218,6 +218,21 @@ Each model ranks the cart abandoners and discounts the share it thinks least lik
 
 At the 60% share, the Transformer wastes **€68,785 instead of €119,729: 43% less**. The cost is that 7,315 cart abandoners who did not come back got no nudge, against 4,080 under the rule. A shop can move along this line: more discounts, fewer people left out, more margin wasted. In the demo, the owner's slider moves along the same line. Its high cut-off is the 40th, 60th or 80th percentile of validation cart-abandoner scores at the stingy, middle and generous ends, so the middle setting is the 60% policy above. Its extra "just browsing" floor changes the middle-setting result by only €43 and 44 shoppers (€68,742 wasted, 7,359 left without a nudge; `results/money_curve.csv`).
 
+### Against a smart email workflow
+
+"Discount every cart" is the naive baseline. A careful marketer would use a smarter flow, so we tested two on the same test cart abandoners (`notebooks/07_smart_workflows.ipynb`). **Escalation** sends a reminder first, and the 10% only if the shopper still has not bought after D hours. This is strong because shoppers who come back do it fast: 41.9% within 24 h, 66.9% within 48 h. **Segment rules** are the best 2–3-condition rule chosen on validation at about Nudge's number of discounts.
+
+| Policy | Discounts | € wasted (95% range) | vs rule | Left without a nudge |
+| --- | --- | --- | --- | --- |
+| Rule (everyone, at once) | 16,467 | 119,729 (110,338–128,152) | – | 4,080 |
+| Escalation, 24 h | 15,443 | 72,523 (66,600–78,648) | −39% | 3,967 |
+| Escalation, 48 h | 14,763 | 42,317 (38,477–47,772) | −65% | 3,890 |
+| Segment rule: 4+ clicks and cart ≤ €458 | 10,719 | 51,584 (48,214–55,106) | −57% | 8,838 |
+| Nudge, 60% | 11,987 | 68,785 (63,208–73,912) | −43% | 7,315 |
+| **Nudge, 60% + escalation 24 h** | 11,313 | **41,139 (37,321–44,864)** | **−66%** | 7,301 |
+
+The honest reading: **on its own, Nudge does not beat a 48-hour escalation flow** on wasted discounts. Waiting two days filters out most people who come back anyway, with no model. The segment rule also wastes less, partly for a mechanical reason: skipping big carts saves euros whatever the shopper's intent. What the intent score adds is shown in the last row: used as a condition inside a 24-hour escalation flow, it reaches the lowest waste with fewer discounts and half the delay. So Nudge is not a replacement for a smart flow; it is a signal to put inside one. Our data has no messages, so it cannot say whether a 48-hour delay loses sales; that is another question for the A/B test.
+
 ### Robustness: train on October, test on November
 
 The main split mixes both months. A real shop trains on the past and predicts the future, and November 2019 includes Black Friday (come-back rate 7.4% in October vs 9.3% in November). Week 6 slide 23 says "respect time: never train on future data". So we trained on visits deciding by 24 October and scored test shoppers' November visits. To separate "different month" from "less data", we also trained a reference model on a same-size random sample from both months.
@@ -288,6 +303,8 @@ Attention is not an explanation. High attention on a click shows where the model
 ## 9. Limits and the next step
 
 - **Prediction is not causation.** Nudge predicts who comes back *without help*. It does not prove that a discount *causes* extra sales among the shoppers it targets. That needs an A/B test: a random group of shoppers gets no message, the rest get Nudge's decision, and the two are compared. **We propose that Hostinger runs this test as the next step**, with Hostinger Reach as the sending tool. This is also why any "extra sales" figure in the demo is a labelled assumption.
+- **Only reachable shoppers can be messaged.** Email or WhatsApp needs contact details: logged-in customers, shoppers who typed an email at checkout, subscribers or opt-ins. An anonymous visitor who only browsed cannot be messaged by any tool. Our money results use cart abandoners only, the group shops most often can reach, but the data does not say what share of REES46 shoppers were logged in. For anonymous visitors the same score could drive an on-site exit offer instead of a message.
+- **A smart flow is a strong competitor.** A 48-hour "reminder first, discount later" flow wastes less than Nudge alone (section 5). Nudge's value is as a signal inside such a flow.
 - **Logged-out shoppers are invisible** (failure 3). Cross-device purchases without a login are missed and labelled "did not come back".
 - **Cut-offs per shop.** The cut-offs were set on electronics. The cosmetics test shows the ranking travels but the money does not: each shop should set its slider on its own data.
 - **Old, short data.** One shop, two months of 2019, including Black Friday. The October → November check is reassuring, but a 2026 shop may behave differently.
