@@ -357,3 +357,28 @@ Paired bootstrap: Transformer − RNN +0.0024 AUC (+0.0018..+0.0029), +0.009 PR-
 **Five failures (test AUC on the slice):** one-click visits 0.735 (fine, but recall only 25%); new shoppers 0.674 (weakest: little to go on); returning 0.678; only one scored visit in our data 0.747 but come-back rate just 1.6%; 30+ clicks 0.675; any expensive product 0.722.
 
 **Round 1 → round 2:** Transformer test AUC 0.682 → 0.729. Most of the gain is the history words (LR alone 0.676 → 0.716); bigger data and tuning add the rest.
+
+## 13. Second-shop test (cosmetics) — 21 Nov
+
+**Question:** the Transformer was trained only on the electronics store. Does it still rank shoppers in a different shop, with **no retraining**? Notebook `notebooks/06_second_shop.ipynb`, builder `scripts/build_cosmetics_visits.py`, results `results/second_shop_*.csv` and `second_shop_summary.json`.
+
+**Setup:** REES46 cosmetics shop (Kaggle mkechinov/ecommerce-events-history-in-cosmetics-shop), Oct 1 to Nov 30 2019, 1 in 4 shoppers (`user_id % 4 == 0`), the same `build_visits` (60 min idle, 7-day label, history words, 14-day lookback). Result: 182,980 abandoned visits from 178,442 shoppers, **7.9% come back and buy** (electronics 8.7%), 23% cart abandoners, 40% returning. `remove_from_cart` exists here and was dropped as the contract says: 423,878 of 2,192,053 sampled events (19.3%). Scored with the final models as they are: Transformer = `app/model.pt` (3 seeds averaged), logistic regression = the 3 tuned seeds in `results/tuned/`.
+
+**Distribution shift (price bands):** 99.0% cheap / 0.9% mid / 0.1% expensive clicks, against 34 / 30 / 36% in electronics (median price €4.13 vs €165). The `mid` and `expensive` words almost never occur, so the model effectively sees one price word.
+
+| Model (all 182,980 visits) | AUC (95%) | PR-AUC (95%) | top-10% come-back rate |
+| --- | --- | --- | --- |
+| Random | 0.497 (0.492–0.502) | 0.078 | 7.6% |
+| Industry rule | 0.716 (0.708–0.723) | 0.164 (0.158–0.169) | 21.3% |
+| Logistic regression | 0.836 (0.832–0.839) | 0.254 (0.243–0.263) | 28.9% |
+| Transformer | **0.841** (0.837–0.846) | **0.288** (0.273–0.301) | **31.2%** (4.0x average) |
+
+Paired shopper bootstrap (200 draws): Transformer minus rule AUC **+0.125** (+0.116..+0.135); Transformer minus logistic regression +0.005 (+0.003..+0.007), same size as on electronics.
+
+**Finding: the ranking carries over, and is not weaker.** AUC is higher here (0.841) than on electronics (0.729). Do not read that as "the model is better in cosmetics": the industry rule also jumps (0.562 to 0.716), so this shop is simply easier. Cart abandoners come back far more often here (the rule alone ranks well). The honest claim is "it still beats the rule by a wide margin in a different shop without retraining", and the Transformer-over-logistic-regression gain is small in both shops.
+
+**Calibration (Transformer, by score decile):** overall mean predicted 7.3% vs actual 7.9% (ratio 1.07), Spearman between decile prediction and actual 0.96. Middle deciles (6 to 8) are almost exact; the top two deciles are under-confident (predicted 16% / 26%, actual 20% / 31%) and the bottom four are over-confident (predicted about 1.5%, actual 0.4% to 0.9%). So the scale is roughly right but the extremes are stretched, as expected in a new shop. The cut-offs (5.5% / 30%) were set on electronics and still work as a rough guide.
+
+**Money at the middle setting (`cutoffs(0.5)`, cart abandoners, one discount per shopper per week):** rule wastes €21,265 on shoppers who came back anyway (95% 20,278–22,358); Nudge (Transformer) wastes €19,468 (18,508–20,442), **-8%**, and leaves 13,242 non-returning cart abandoners without a nudge vs 8,951 for the rule. That is a much smaller saving than on electronics (-43% at the 60% setting; that comparison is not like for like, different setting and shop). Reason: the electronics cut-offs send a discount to most cart abandoners here (24,299 of 42,554 cart abandoners, 57%), because cosmetics scores sit lower. The logistic regression with the same cut-offs gives fewer discounts (14,368) and wastes -50%, but the cut-offs were never tuned for it, so do not compare it with the Transformer on money. Euro amounts are small because cosmetics are cheap; compare the percentages.
+
+**Caveats to say openly:** (1) this is a second Kaggle shop from the same company (REES46), same click format, same months, not an independent platform. (2) One month-window shift and no new training, so it tests the model, not the recipe. (3) The money cut-offs are not re-tuned per shop, a shop owner would set the slider on their own data. (4) The same limitation as everywhere: this predicts who comes back, not that a discount causes it.

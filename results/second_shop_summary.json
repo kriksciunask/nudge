@@ -1,0 +1,142 @@
+{
+  "shop": "REES46 cosmetics (Oct-Nov 2019, 1 in 4 shoppers, no retraining)",
+  "events_by_type_sampled": {
+    "cart": 638905,
+    "purchase": 144653,
+    "remove_from_cart": 423878,
+    "view": 984617
+  },
+  "remove_from_cart_dropped": 423878,
+  "visits": 182980,
+  "shoppers": 178442,
+  "base_rate": 0.07865340474368783,
+  "cart_abandoner_share": 0.2325609356213794,
+  "returning_share": 0.4035085801726965,
+  "price_band_share_cosmetics": {
+    "cheap": 0.9895,
+    "mid": 0.0095,
+    "expensive": 0.001
+  },
+  "price_band_share_main": {
+    "expensive": 0.3594,
+    "cheap": 0.3401,
+    "mid": 0.3006
+  },
+  "auc": {
+    "Random": [
+      0.49704441399106414,
+      0.49215232719651203,
+      0.5023943670988229
+    ],
+    "Industry rule": [
+      0.7160623788114584,
+      0.7076046498154398,
+      0.7226146152422613
+    ],
+    "Logistic regression": [
+      0.8360808736958166,
+      0.8323083459241284,
+      0.8393507310851132
+    ],
+    "Transformer": [
+      0.8411628293501662,
+      0.8365440325068412,
+      0.8456937554992875
+    ]
+  },
+  "pr_auc": {
+    "Random": [
+      0.0778641694499644,
+      0.07477321646967104,
+      0.08147243277386455
+    ],
+    "Industry rule": [
+      0.16357812607110622,
+      0.15781252499753834,
+      0.16913656078785103
+    ],
+    "Logistic regression": [
+      0.25394499197181686,
+      0.24313865384704025,
+      0.26295539140964774
+    ],
+    "Transformer": [
+      0.2875093002888126,
+      0.27273153804847544,
+      0.3005217222299247
+    ]
+  },
+  "top10": {
+    "Random": [
+      0.07618318941960871,
+      0.07134797238212069,
+      0.08137911351656789
+    ],
+    "Industry rule": [
+      0.21330544719650327,
+      0.20569710346494116,
+      0.21985254539900206
+    ],
+    "Logistic regression": [
+      0.2893758880751995,
+      0.2762786544459797,
+      0.2988137789696565
+    ],
+    "Transformer": [
+      0.3121501565720124,
+      0.29318750983567327,
+      0.32661199441588884
+    ]
+  },
+  "diff_auc_transformer_minus_rule": [
+    0.12510045053870777,
+    0.11643610595215895,
+    0.13458272892871864
+  ],
+  "mean_predicted": 0.07340369373559952,
+  "cutoffs_middle": [
+    0.055,
+    0.30000000000000004
+  ],
+  "money": {
+    "Industry rule (everyone)": {
+      "cart_abandoners": 42554,
+      "discounts_sent": 28941,
+      "wasted_eur": 21264.781,
+      "came_back_anyway_with_discount": 4415,
+      "spared_discount_came_back": 4662,
+      "left_without_nudge": 8951,
+      "wasted_eur_lo": 20277.561,
+      "wasted_eur_hi": 22357.8214,
+      "left_without_nudge_lo": 8596.575,
+      "left_without_nudge_hi": 9343.025,
+      "wasted_vs_rule": 0.0
+    },
+    "Nudge: Transformer, middle setting": {
+      "cart_abandoners": 42554,
+      "discounts_sent": 24299,
+      "wasted_eur": 19467.881,
+      "came_back_anyway_with_discount": 4064,
+      "spared_discount_came_back": 5013,
+      "left_without_nudge": 13242,
+      "wasted_eur_lo": 18507.5359,
+      "wasted_eur_hi": 20442.2302,
+      "left_without_nudge_lo": 12877.575,
+      "left_without_nudge_hi": 13645.325,
+      "wasted_vs_rule": -0.0845
+    },
+    "Logistic regression, same cut-offs": {
+      "cart_abandoners": 42554,
+      "discounts_sent": 14368,
+      "wasted_eur": 10573.16,
+      "came_back_anyway_with_discount": 2302,
+      "spared_discount_came_back": 6775,
+      "left_without_nudge": 21411,
+      "wasted_eur_lo": 10015.8639,
+      "wasted_eur_hi": 11143.3552,
+      "left_without_nudge_lo": 20999.05,
+      "left_without_nudge_hi": 21870.3,
+      "wasted_vs_rule": -0.5028
+    }
+  }
+}

@@ -1,0 +1,4 @@
+policy,cart_abandoners,discounts_sent,wasted_eur,came_back_anyway_with_discount,spared_discount_came_back,left_without_nudge,wasted_eur_lo,wasted_eur_hi,left_without_nudge_lo,left_without_nudge_hi,wasted_vs_rule
+Industry rule (everyone),42554,28941,21264.781,4415,4662,8951,20277.561,22357.8214,8596.575,9343.025,0.0
+"Nudge: Transformer, middle setting",42554,24299,19467.881,4064,5013,13242,18507.5359,20442.2302,12877.575,13645.325,-0.0845
+"Logistic regression, same cut-offs",42554,14368,10573.16,2302,6775,21411,10015.8639,11143.3552,20999.05,21870.3,-0.5028
