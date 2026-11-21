@@ -1,4 +1,5 @@
-policy,cart_abandoners,discounts_sent,wasted_eur,came_back_anyway_with_discount,spared_discount_came_back,left_without_nudge,wasted_eur_lo,wasted_eur_hi,left_without_nudge_lo,left_without_nudge_hi,wasted_vs_rule
-Industry rule (everyone),42554,28941,21264.781,4415,4662,8951,20277.561,22357.8214,8596.575,9343.025,0.0
-"Nudge: Transformer, middle setting",42554,24299,19467.881,4064,5013,13242,18507.5359,20442.2302,12877.575,13645.325,-0.0845
-"Logistic regression, same cut-offs",42554,14368,10573.16,2302,6775,21411,10015.8639,11143.3552,20999.05,21870.3,-0.5028
+policy,cart_abandoners,discounts_sent,wasted_eur,came_back_anyway_with_discount,spared_discount_came_back,left_without_nudge,wasted_eur_lo,wasted_eur_hi,left_without_nudge_lo,left_without_nudge_hi,wasted_vs_rule,share_of_cart_abandoners_discounted
+Industry rule (everyone),42554,28941,21264.781,4415,4662,8951,20277.561,22357.8214,8596.575,9343.025,0.0,0.6801
+"Nudge: Transformer, g=0.0",42554,14965,10037.25,2233,6844,20745,9501.9544,10616.4465,20285.4,21241.875,-0.528,0.3517
+"Nudge: Transformer, g=0.5",42554,21422,15005.037,3270,5807,15325,14285.739,15700.1316,14950.475,15730.225,-0.2944,0.5034
+"Nudge: Transformer, g=1.0",42554,26037,19004.629,4002,5075,11442,18148.8278,19912.8007,11089.7,11836.225,-0.1063,0.6119

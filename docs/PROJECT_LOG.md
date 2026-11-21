@@ -379,6 +379,15 @@ Paired shopper bootstrap (200 draws): Transformer minus rule AUC **+0.125** (+0.
 
 **Calibration (Transformer, by score decile):** overall mean predicted 7.3% vs actual 7.9% (ratio 1.07), Spearman between decile prediction and actual 0.96. Middle deciles (6 to 8) are almost exact; the top two deciles are under-confident (predicted 16% / 26%, actual 20% / 31%) and the bottom four are over-confident (predicted about 1.5%, actual 0.4% to 0.9%). So the scale is roughly right but the extremes are stretched, as expected in a new shop. The cut-offs (5.5% / 30%) were set on electronics and still work as a rough guide.
 
-**Money at the middle setting (`cutoffs(0.5)`, cart abandoners, one discount per shopper per week):** rule wastes €21,265 on shoppers who came back anyway (95% 20,278–22,358); Nudge (Transformer) wastes €19,468 (18,508–20,442), **-8%**, and leaves 13,242 non-returning cart abandoners without a nudge vs 8,951 for the rule. That is a much smaller saving than on electronics (-43% at the 60% setting; that comparison is not like for like, different setting and shop). Reason: the electronics cut-offs send a discount to most cart abandoners here (24,299 of 42,554 cart abandoners, 57%), because cosmetics scores sit lower. The logistic regression with the same cut-offs gives fewer discounts (14,368) and wastes -50%, but the cut-offs were never tuned for it, so do not compare it with the Transformer on money. Euro amounts are small because cosmetics are cheap; compare the percentages.
+**Money (cart abandoners, one discount per shopper per week; updated after `cutoffs()` changed, commit 02446dc):** cut-offs (low, high): g=0 (0.080, 0.175), g=0.5 (0.055, 0.215), g=1 (0.030, 0.266). The rule discounts 28,941 of 42,554 cart abandoners (68%, after one-per-week) and wastes €21,265 on shoppers who came back anyway (95% 20,278–22,358), leaving 8,951 non-returning cart abandoners without a nudge.
+
+| Policy | discounts | wasted € (95%) | vs rule | left without nudge |
+| --- | --- | --- | --- | --- |
+| Industry rule | 28,941 | 21,265 (20,278–22,358) | 0 | 8,951 |
+| Nudge g=0 (stingy) | 14,965 | 10,037 (9,502–10,616) | -53% | 20,745 |
+| **Nudge g=0.5 (middle)** | 21,422 | 15,005 (14,286–15,700) | **-29%** | 15,325 |
+| Nudge g=1 (generous) | 26,037 | 19,005 (18,149–19,913) | -11% | 11,442 |
+
+At the middle setting Nudge saves 29% of the wasted discount (electronics: -43% at the reported 60% policy; not like for like). The saving is real but the price is more cart abandoners skipped (15,325 vs 8,951). Cosmetics scores sit lower than electronics, so the same cut-offs discount fewer shoppers than the slider label suggests: g=0.5 discounts 50% of cart abandoners, and the generous end is needed to get close to the rule. A shop owner would set the slider on their own data. Euro amounts are small because cosmetics are cheap; compare percentages.
 
 **Caveats to say openly:** (1) this is a second Kaggle shop from the same company (REES46), same click format, same months, not an independent platform. (2) One month-window shift and no new training, so it tests the model, not the recipe. (3) The money cut-offs are not re-tuned per shop, a shop owner would set the slider on their own data. (4) The same limitation as everywhere: this predicts who comes back, not that a discount causes it.

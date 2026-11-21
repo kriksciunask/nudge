@@ -94,10 +94,20 @@
     0.13458272892871864
   ],
   "mean_predicted": 0.07340369373559952,
-  "cutoffs_middle": [
-    0.055,
-    0.30000000000000004
-  ],
+  "cutoffs": {
+    "0.0": [
+      0.08,
+      0.1745
+    ],
+    "0.5": [
+      0.055,
+      0.2146
+    ],
+    "1.0": [
+      0.03,
+      0.2662
+    ]
+  },
   "money": {
     "Industry rule (everyone)": {
       "cart_abandoners": 42554,
@@ -110,33 +120,50 @@
       "wasted_eur_hi": 22357.8214,
       "left_without_nudge_lo": 8596.575,
       "left_without_nudge_hi": 9343.025,
-      "wasted_vs_rule": 0.0
+      "wasted_vs_rule": 0.0,
+      "share_of_cart_abandoners_discounted": 0.6801
     },
-    "Nudge: Transformer, middle setting": {
+    "Nudge: Transformer, g=0.0": {
       "cart_abandoners": 42554,
-      "discounts_sent": 24299,
-      "wasted_eur": 19467.881,
-      "came_back_anyway_with_discount": 4064,
-      "spared_discount_came_back": 5013,
-      "left_without_nudge": 13242,
-      "wasted_eur_lo": 18507.5359,
-      "wasted_eur_hi": 20442.2302,
-      "left_without_nudge_lo": 12877.575,
-      "left_without_nudge_hi": 13645.325,
-      "wasted_vs_rule": -0.0845
+      "discounts_sent": 14965,
+      "wasted_eur": 10037.25,
+      "came_back_anyway_with_discount": 2233,
+      "spared_discount_came_back": 6844,
+      "left_without_nudge": 20745,
+      "wasted_eur_lo": 9501.9544,
+      "wasted_eur_hi": 10616.4465,
+      "left_without_nudge_lo": 20285.4,
+      "left_without_nudge_hi": 21241.875,
+      "wasted_vs_rule": -0.528,
+      "share_of_cart_abandoners_discounted": 0.3517
     },
-    "Logistic regression, same cut-offs": {
+    "Nudge: Transformer, g=0.5": {
       "cart_abandoners": 42554,
-      "discounts_sent": 14368,
-      "wasted_eur": 10573.16,
-      "came_back_anyway_with_discount": 2302,
-      "spared_discount_came_back": 6775,
-      "left_without_nudge": 21411,
-      "wasted_eur_lo": 10015.8639,
-      "wasted_eur_hi": 11143.3552,
-      "left_without_nudge_lo": 20999.05,
-      "left_without_nudge_hi": 21870.3,
-      "wasted_vs_rule": -0.5028
+      "discounts_sent": 21422,
+      "wasted_eur": 15005.037,
+      "came_back_anyway_with_discount": 3270,
+      "spared_discount_came_back": 5807,
+      "left_without_nudge": 15325,
+      "wasted_eur_lo": 14285.739,
+      "wasted_eur_hi": 15700.1316,
+      "left_without_nudge_lo": 14950.475,
+      "left_without_nudge_hi": 15730.225,
+      "wasted_vs_rule": -0.2944,
+      "share_of_cart_abandoners_discounted": 0.5034
+    },
+    "Nudge: Transformer, g=1.0": {
+      "cart_abandoners": 42554,
+      "discounts_sent": 26037,
+      "wasted_eur": 19004.629,
+      "came_back_anyway_with_discount": 4002,
+      "spared_discount_came_back": 5075,
+      "left_without_nudge": 11442,
+      "wasted_eur_lo": 18148.8278,
+      "wasted_eur_hi": 19912.8007,
+      "left_without_nudge_lo": 11089.7,
+      "left_without_nudge_hi": 11836.225,
+      "wasted_vs_rule": -0.1063,
+      "share_of_cart_abandoners_discounted": 0.6119
     }
   }
 }
