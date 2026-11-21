@@ -7,10 +7,11 @@ at most one discount per shopper per 7 days, wasted = 10% of what shoppers who c
 Scores = average of the 3 final Transformer seeds (results/tuned/transformer_4eb04ce3_s{42,43,44}_test.npy),
 in test-split row order (the order notebooks/05_evaluation.ipynb uses).
 
-How this differs from evaluation_money.csv: there "Transformer (60%)" gave a discount to the 60% of cart
-abandoners with the LOWEST scores (cut-off = 60th percentile of validation cart scores, no lower limit).
-The decision layer instead uses fixed probability cut-offs with a lower limit (just browsing gets nothing),
-so its numbers are NOT expected to match "@60%". The industry rule row must match exactly (printed below).
+How this relates to evaluation_money.csv: "Transformer (60%)" there gives a discount to the 60% of cart abandoners
+with the LOWEST scores (cut-off = 60th percentile of validation cart scores, no lower limit). The decision layer's
+HIGH cut-off at g=0.5 is that same validation number (0.2146). It adds a LOWER limit (just browsing gets nothing,
+8% at g=0 down to 3% at g=1), so g=0.5 differs slightly from the pure @60% numbers; the script prints both.
+The industry rule row must match exactly (printed below).
 
 Run: .venv/bin/python scripts/make_money_curve.py   (light: ~1 min, one process)
 """
@@ -75,3 +76,7 @@ cut = np.quantile(vs[(val["cart_value"] > 0).to_numpy()], 0.6)
 m60 = money(test, score < cut)
 o = off.loc["Transformer (60%)"]
 print(f"CHECK Transformer@60% reproduced: wasted {m60['wasted_eur']:.0f} (official {o['€ wasted']}), left {m60['left_without_nudge']} (official {o['left without a nudge']})")
+lo5, hi5 = cutoffs(0.5)
+c5 = curve[curve["g"] == 0.5].iloc[0]
+print(f"g=0.5 cut-offs low {lo5:.3f} high {hi5:.4f} (validation 60th percentile = {cut:.4f}); "
+      f"with the low limit: wasted {c5['wasted_eur']:.0f}, left {c5['left_without_nudge']:.0f}; pure @60%: wasted {m60['wasted_eur']:.0f}, left {m60['left_without_nudge']}")

@@ -745,7 +745,7 @@ def owner_html(curve: pd.DataFrame, g: float) -> str:
     line = " L".join(f"{px(k):.2f},{py(curve.loc[k, 'wasted_eur']):.2f}" for k in gs)
     low_y = 100 - py(wasted)                                           # dot height, % from the bottom
     where = ("right:" + f"{100 - px(g):.2f}%;" if g > 0.55 else "left:" + f"{px(g):.2f}%;")
-    below = low_y > 68 or g < 0.3
+    below = g <= 0.55                                                  # the line rises: free space is below-right / above-left
     tag_y = f"top:calc({py(wasted):.2f}% + 14px)" if below else f"bottom:calc({low_y:.2f}% + 14px)"
     label = (f"Discount money wasted on shoppers who would have bought anyway, by how generous the shop is. "
              f"Discount everyone: {euro(rule)} at every setting. Nudge at this setting: {euro(wasted)}.")
