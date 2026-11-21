@@ -40,7 +40,7 @@ def test_meter_starts_calm():
     html = panel(at)
     assert points(at) == 1
     assert "Browse or add something to cart to see it move" in html
-    assert "start value, new visitor" in html
+    assert "start, new visitor" in html
     assert words_shown(at) == ["new"]
 
 
@@ -55,7 +55,7 @@ def test_meter_moves_after_clicks():
     at.button(key="detail_cart").click().run()          # add it to the cart = one cart click
     assert points(at) == 3
     assert words_shown(at)[-1].startswith("cart_")
-    assert re.search(r'class="nm-delta">(▲ \+\d+ pts|▼ −\d+ pts|no change)<', panel(at))
+    assert re.search(r'class="nm-delta">(▲ \+\d+ pts|▼ −\d+ pts|about the same)<', panel(at))
     rm = next(b for b in at.button if b.key and b.key.startswith("rm_"))
     rm.click().run()                                    # remove: not a model click, the chance stays
     assert points(at) == 3 and "removing isn" in panel(at)
@@ -72,6 +72,21 @@ def test_history_controls_change_words_and_chance():
     assert not at.exception, at.exception
     assert words_shown(at)[:4] == ["returning", "bought_recently", "visits_5plus", "last_today"]
     assert chance_shown(at) > new_chance + 5           # the strongest signals: the % visibly reacts
+
+
+def test_panel_copy_and_chips():
+    at = fresh()
+    html = panel(at)
+    assert "If they leave now → no message" in html and "New visitor, nothing clicked yet." in html
+    next(b for b in at.button if b.key and b.key.startswith("gv_")).click().run()     # view 1 (product page)
+    for _ in range(2):                                                                # views 2-3 from "You might also like"
+        next(b for b in at.button if b.key and b.key.startswith("sv_")).click().run()
+    at.button(key="detail_cart").click().run()                                       # cart click
+    assert not at.exception, at.exception
+    html = panel(at)
+    assert re.search(r'class="nm-why">Just added (a|an) [a-z-]+ item to cart, ', html)
+    assert len(words_shown(at)) == 4 and "+ 1 earlier word<" in html                # 5 words: last 4 + count
+    assert html.count('class="nm-cut"') == 2 and html.count('class="cut"') == 2     # cut-off lines with their values
 
 
 def test_leave_page_uses_same_words_and_chart():

@@ -28,7 +28,8 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
-from nudge.contract import predict, session_words  # noqa: E402
+from nudge.contract import START_WORDS, predict, session_words  # noqa: E402
+START_WORDS_SET = set(START_WORDS)
 from nudge.decision import DISCOUNT, DISCOUNT_RATE, NOTHING, REMINDER, cutoffs, decide  # noqa: E402
 
 SHOP = "Mercato"
@@ -220,60 +221,65 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-chip { display:inline-block; font-size: 15px; font-weight: 500; line-height: 1.3; padding: 6px 10px; border-radius: 8px;
   background:#fff; border:1px solid var(--line); color: var(--ink); }
 .bz-chip.cart { border-color: #BFDCCB; background: var(--ok-soft); color: var(--ok); font-weight: 600; }
-.bz-chip.start { background: var(--ink); color:#fff; border-color: var(--ink); }
-.bz-more { color: var(--muted); font-size: 13px; }
+.bz-chip.ctx { background: var(--ink); color:#fff; border-color: var(--ink); }
+.bz-more { color: var(--muted); font-size: 13px; padding: 2px 0; }
 .bz-nudge-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 4px 0 8px 0; }
-.bz-chip.hist { background: var(--soft-2); border-color: var(--soft-2); color: var(--ink-2); }
 
 /* --- Live meter: the chance after every click (every part has a fixed height, so nothing jumps) --- */
-.nm-label { font-size: 14px; font-weight: 600; color: var(--ink-2); margin-top: 10px; }
-.nm-hero-row { display:flex; align-items:baseline; gap: 12px; height: 50px; }
-.nm-hero { font-size: 48px; font-weight: 800; line-height: 1; letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
-.nm-hero sup { font-size: .42em; vertical-align: top; position: relative; top: .2em; margin-left: 3px; letter-spacing: 0; color: var(--muted); }
-.nm-delta { font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; min-width: 0; animation: nm-fade .4s ease-out both; }
-.nm-sub { font-size: 13px; line-height: 1.45; color: var(--muted); height: 2.9em; }
-.nm-chart { display:grid; grid-template-columns: minmax(0,1fr) 92px; grid-template-rows: var(--h) 18px; column-gap: 10px; margin-top: 14px; }
-.nm-chart.big { grid-template-columns: minmax(0,1fr) 128px; column-gap: 14px; }
+.nm-label { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-top: 10px; }
+.nm-sub { font-size: 14px; line-height: 1.4; color: var(--muted); min-height: 2.8em; margin-top: 2px; }
+.nm-hero-row { display:flex; align-items:baseline; gap: 12px; height: 60px; }
+.nm-hero { font-size: 58px; font-weight: 800; line-height: 1; letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.nm-hero sup { font-size: .4em; vertical-align: top; position: relative; top: .22em; margin-left: 3px; letter-spacing: 0; color: var(--muted); }
+.nm-delta { font-size: 14px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
+  min-width: 0; animation: nm-fade .4s ease-out both; }
+.nm-chart { --y: 36px; --lab: 118px; display:grid; grid-template-columns: var(--y) minmax(0,1fr); grid-template-rows: var(--h) 22px; margin-top: 12px; }
+.nm-chart.big { --y: 42px; --lab: 158px; }
+.nm-y { position: relative; }
+.nm-y span { position:absolute; right: 7px; transform: translateY(50%); font-size: 12px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nm-y span.cut { font-weight: 700; color: var(--ink-2); }
 .nm-plot { position: relative; }
 .nm-zones { position:absolute; inset:0; border-radius: 8px; overflow:hidden; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); }
 .nm-zone { position:absolute; left:0; right:0; transition: background-color .2s ease; }
-.nm-zone.z0 { background: color-mix(in srgb, var(--faint) 10%, var(--paper)); }
-.nm-zone.z1 { background: color-mix(in srgb, var(--accent) 8%, var(--paper)); border-top: 1px solid color-mix(in srgb, var(--accent) 22%, var(--paper)); }
-.nm-zone.z2 { background: color-mix(in srgb, var(--ink-2) 3%, var(--paper)); border-bottom: 1px solid var(--line); }
-.nm-zone.z0.on { background: color-mix(in srgb, var(--faint) 22%, var(--paper)); }
+.nm-zone.z0 { background: color-mix(in srgb, var(--faint) 12%, var(--paper)); }
+.nm-zone.z1 { background: color-mix(in srgb, var(--accent) 8%, var(--paper)); }
+.nm-zone.z2 { background: color-mix(in srgb, var(--ink-2) 3%, var(--paper)); }
+.nm-zone.z0.on { background: color-mix(in srgb, var(--faint) 24%, var(--paper)); }
 .nm-zone.z1.on { background: color-mix(in srgb, var(--accent) 16%, var(--paper)); }
-.nm-zone.z2.on { background: color-mix(in srgb, var(--ink-2) 9%, var(--paper)); }
-.nm-ymax { position:absolute; top: 4px; left: 6px; font-size: 10.5px; font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; }
-.nm-svg { position:absolute; inset:0; width:100%; height:100%; overflow: visible; color: var(--ink); }
-.nm-svg path { fill:none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.nm-new { animation: nm-draw .45s cubic-bezier(.2,.7,.2,1) both; }
-.nm-dot { position:absolute; width:6px; height:6px; margin: 0 0 -3px -3px; border-radius:50%; background: var(--ink); }
-.nm-dot.now { width:12px; height:12px; margin: 0 0 -6px -6px; box-shadow: 0 0 0 3px var(--paper); animation: nm-pop .35s .25s cubic-bezier(.2,.7,.2,1.3) both; }
-.nm-dot.now.z0 { background: var(--muted); } .nm-dot.now.z1 { background: var(--accent); } .nm-dot.now.z2 { background: var(--ink); }
-.nm-hint { position:absolute; left: 14%; right: 5%; top: 50%; transform: translateY(-50%); font-size: 12.5px; line-height: 1.4; color: var(--ink-2);
-  background: var(--paper); padding: 6px 9px; border-radius: 6px; box-shadow: 0 0 0 1px var(--line), 0 2px 6px -2px rgba(20,22,26,.12); }
-.nm-gutter { position: relative; }
-.nm-zl { position:absolute; left:0; right:0; transform: translateY(-50%); font-size: 11.5px; line-height: 1.2; font-weight: 600; color: var(--faint); white-space: nowrap; }
-.nm-zl.on { font-weight: 700; }
+.nm-zone.z2.on { background: color-mix(in srgb, var(--ink-2) 10%, var(--paper)); }
+.nm-cut { position:absolute; left:0; right:0; height:0; border-top: 1.5px dashed color-mix(in srgb, var(--ink-2) 45%, transparent); }
+.nm-zl { position:absolute; right: 10px; transform: translateY(-50%); font-size: 13px; line-height: 1.2; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.nm-zl.on { font-weight: 800; }
 .nm-zl.z0.on { color: var(--ink-2); } .nm-zl.z1.on { color: var(--accent); } .nm-zl.z2.on { color: var(--ink); }
-.nm-x { grid-column: 1; display:flex; justify-content:space-between; align-items:flex-end; font-size: 11px; color: var(--faint); padding: 0 2px; }
-.nm-chart.big .nm-zl { font-size: 14px; }
-.nm-chart.big .nm-ymax, .nm-chart.big .nm-x { font-size: 12.5px; }
-.nm-chart.big .nm-dot { width:8px; height:8px; margin: 0 0 -4px -4px; }
-.nm-chart.big .nm-dot.now { width:16px; height:16px; margin: 0 0 -8px -8px; }
-.nm-chart.big .nm-svg path { stroke-width: 2.5; }
-.nm-act { display:flex; align-items:center; gap: 8px; margin-top: 10px; font-size: 14.5px; font-weight: 700; height: 20px; white-space: nowrap; }
-.nm-act i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.nm-line { position:absolute; top:0; bottom:0; left:0; right: var(--lab); }
+.nm-svg { position:absolute; inset:0; width:100%; height:100%; overflow: visible; color: var(--ink); }
+.nm-svg path { fill:none; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.nm-new { animation: nm-draw .45s cubic-bezier(.2,.7,.2,1) both; }
+.nm-dot { position:absolute; width:7px; height:7px; margin: 0 0 -3.5px -3.5px; border-radius:50%; background: var(--ink); }
+.nm-dot.now { width:14px; height:14px; margin: 0 0 -7px -7px; box-shadow: 0 0 0 3px var(--paper); animation: nm-pop .35s .25s cubic-bezier(.2,.7,.2,1.3) both; }
+.nm-dot.now.z0 { background: var(--muted); } .nm-dot.now.z1 { background: var(--accent); } .nm-dot.now.z2 { background: var(--ink); }
+.nm-hint { position:absolute; left: 14%; right: 0; top: 30%; transform: translateY(-50%); font-size: 13px; line-height: 1.4; color: var(--ink-2);
+  background: var(--paper); padding: 6px 9px; border-radius: 6px; box-shadow: 0 0 0 1px var(--line), 0 2px 6px -2px rgba(20,22,26,.12); }
+.nm-x { grid-column: 2; display:flex; justify-content:space-between; align-items:flex-end; font-size: 12px; color: var(--muted); padding: 0 var(--lab) 0 0; gap: 12px; white-space: nowrap; }
+.nm-chart.big .nm-x { padding-right: calc(var(--lab) - 96px); }
+.nm-chart.big .nm-zl { font-size: 15px; }
+.nm-chart.big .nm-y span, .nm-chart.big .nm-x { font-size: 13px; }
+.nm-chart.big .nm-dot { width:9px; height:9px; margin: 0 0 -4.5px -4.5px; }
+.nm-chart.big .nm-dot.now { width:18px; height:18px; margin: 0 0 -9px -9px; }
+.nm-chart.big .nm-svg path { stroke-width: 3; }
+.nm-act { display:flex; align-items:flex-start; gap: 8px; margin-top: 12px; font-size: 15px; line-height: 1.3; font-weight: 700; height: 2.6em; }
+.nm-act span { text-wrap: balance; }
+.nm-act i { width: 9px; height: 9px; border-radius: 2px; flex: none; margin-top: .38em; }
 .nm-act.z0 { color: var(--ink-2); } .nm-act.z0 i { background: var(--muted); }
 .nm-act.z1 { color: var(--accent); } .nm-act.z1 i { background: var(--accent); }
 .nm-act.z2 { color: var(--ink); } .nm-act.z2 i { background: var(--ink); }
-.nm-words { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+.nm-why { font-size: 13.5px; line-height: 1.4; color: var(--muted); min-height: 2.8em; margin-top: 2px; }
+.nm-words { margin-top: 12px; padding: 12px 0 10px 0; border-top: 1px solid var(--line-2); }
 .nm-words-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px; }
 .nm-words-head b { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
 .nm-words-head span { font-size: 12px; color: var(--muted); }
-.st-key-nudgebox .nm-words .bz-chips { height: 155px; flex-wrap: nowrap; overflow: hidden; margin: 0; gap: 5px; }
-.st-key-nudgebox .bz-chip { font-size: 12.5px; padding: 4px 9px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.st-key-nudgebox .nm-words .bz-chips { min-height: 150px; flex-wrap: nowrap; margin: 0; gap: 6px; }
+.st-key-nudgebox .bz-chip { font-size: 13px; padding: 4px 9px; max-width: 100%; white-space: normal; overflow-wrap: break-word; text-wrap: balance; }
 @keyframes nm-draw { from { clip-path: var(--clip-from); } to { clip-path: inset(0 0 0 0); } }
 @keyframes nm-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes nm-fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
@@ -282,14 +288,16 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 /* --- Result page ("the shopper left") ----------------------------------------------------- */
 .bz-eyebrow { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing:.12em; color: var(--muted); margin-top: 16px; }
 .bz-left-title { font-size: 34px; font-weight: 800; letter-spacing: -.03em; color: var(--ink); margin: 6px 0 0 0; line-height:1.15; }
-.bz-result { display:grid; grid-template-columns: 7fr 5fr; gap: 32px; align-items: stretch; }
+.bz-result { display:grid; grid-template-columns: 7fr 5fr; gap: 32px; align-items: start; }
 .bz-card { border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px; }
 .bz-hero-label { color: var(--muted); font-size: 16px; line-height:1.5; }
 .bz-hero-label b { color: var(--ink); }
 .bz-hero { font-size: 104px; font-weight: 800; color: var(--ink); line-height: .95; letter-spacing: -.06em; font-variant-numeric: tabular-nums;
   margin: 4px 0 8px -4px; }
 .bz-hero sup { font-size: .42em; vertical-align: top; position: relative; top: .18em; margin-left: 4px; letter-spacing:0; color: var(--muted); }
-.bz-story { margin-top: 20px; }
+.bz-top { display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); gap: 28px; align-items: start; }
+.bz-top .bz-decision { margin: 0; padding: 0 0 0 28px; border-top: none; border-left: 1px solid var(--line); min-height: 100%; }
+.bz-story { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
 .bz-story small { display:block; font-size: 13px; font-weight:700; text-transform: uppercase; letter-spacing:.1em; color: var(--muted); margin-bottom: 12px; }
 .bz-decision { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .bz-decision small, .bz-seen small { display:block; font-size: 13px; font-weight:700; text-transform: uppercase; letter-spacing:.1em; color: var(--muted); margin-bottom: 6px; }
@@ -300,17 +308,17 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-money.give { background: var(--accent-soft); color: #9C2C1B; }
 .bz-seen { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .bz-seen .bz-chip { font-size: 13px; padding: 4px 8px; color: var(--muted); }
-.bz-seen .bz-chip.start { color:#fff; }
+.bz-seen .bz-chip.ctx { color:#fff; }
 .bz-seen .bz-chip.cart { color: var(--ok); }
 /* Message preview: a generic chat app on a phone (not a copy of any real app's branding) */
 .bz-phonecol { display:flex; flex-direction:column; gap: 12px; }
-.bz-phone { flex: 1; border-radius: 28px; border: 1px solid var(--line-2); background: #fff; overflow:hidden; display:flex; flex-direction:column;
+.bz-phone { flex: none; border-radius: 28px; border: 1px solid var(--line-2); background: #fff; overflow:hidden; display:flex; flex-direction:column;
   box-shadow: 0 1px 2px rgba(20,22,26,.04), 0 24px 48px -24px rgba(20,22,26,.18); }
 .bz-phone-top { display:flex; align-items:center; gap:12px; padding: 14px 20px; border-bottom: 1px solid var(--line); background:#fff; }
 .bz-ava { width:36px; height:36px; border-radius:50%; background: var(--ink); color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:16px; }
 .bz-phone-top b { font-size: 15px; display:block; color: var(--ink); }
 .bz-phone-top small { font-size: 13px; color: var(--muted); }
-.bz-chat { flex: 1; background: #ECE7DF; padding: 20px 16px 24px 16px; display:flex; flex-direction:column; gap:8px; }
+.bz-chat { flex: none; min-height: 240px; background: #ECE7DF; padding: 20px 16px 24px 16px; display:flex; flex-direction:column; gap:8px; }
 .bz-day { align-self:center; background: rgba(255,255,255,.75); color: var(--muted); font-size: 12px; padding: 4px 10px; border-radius: 8px; margin-bottom: 4px; }
 .bz-bubble { background:#fff; color:#111; padding: 8px 8px 6px 8px; border-radius: 4px 14px 14px 14px; max-width: 88%; font-size: 15px; line-height: 1.45;
   box-shadow: 0 1px 1px rgba(0,0,0,.08); }
@@ -344,14 +352,14 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 @media (max-width: 640px) {
   div[data-testid="stColumn"]:has(.st-key-cartbox) { order: -1; position: static; max-height: none; overflow: visible; min-width: 0; }
   .st-key-nudgebox { margin-top: 8px !important; }
-  .nm-hero { font-size: 44px; }
   .bz-result { grid-template-columns: 1fr; gap: 16px; }
+  .bz-top { grid-template-columns: 1fr; gap: 16px; }
+  .bz-top .bz-decision { padding: 16px 0 0 0; border-left: none; border-top: 1px solid var(--line); }
   .bz-card { padding: 20px; }
   .bz-hero { font-size: 72px; }
   .bz-left-title { font-size: 28px; }
-  .nm-chart.big { grid-template-columns: minmax(0,1fr) 104px; column-gap: 10px; }
-  .nm-chart.big .nm-zl { font-size: 12.5px; }
-  .bz-phone { min-height: 420px; }
+  .nm-chart.big { --lab: 128px; }
+  .nm-chart.big .nm-zl { font-size: 13.5px; }
 }
 .bz-wild { margin-top: 24px; border-top: 1px solid var(--line, #e7e5e1); padding-top: 16px; }
 .bz-wild-title { font-weight: 600; font-size: 15px; margin-bottom: 10px; }
@@ -405,19 +413,37 @@ def chips(words: list[str], last: int | None = None, count_earlier: bool = True)
     shown = list(enumerate(words))
     more = ""
     if last and len(shown) > last:
-        more = f'<span class="bz-more">+ {len(shown) - last} earlier</span>' if count_earlier else ""
+        more = f'<span class="bz-more">+ {len(shown) - last} earlier word{"" if len(shown) - last == 1 else "s"}</span>' if count_earlier else ""
         shown = shown[-last:]
     return more + "".join(
-        f'<span class="bz-chip{" cart" if w.startswith("cart") else ""}{" hist" if w in WORD_FULL else ""}'
-        f'{" start" if i == 0 else ""}" title="{esc(w)}">'
+        f'<span class="bz-chip{" cart" if w.startswith("cart") else ""}{" ctx" if i == 0 or w in WORD_FULL else ""}" '
+        f'title="{esc(w)}">'
         f'{esc(word_label(w))}</span>' for i, w in shown)
 
 
 # --- Live chance: the model's score after every click, and the line chart of it ---------------------
 ZONE_OF = {NOTHING: 0, DISCOUNT: 1, REMINDER: 2}
 ZONE_NAME = ["No message", f"Reminder + {DISCOUNT_RATE:.0%}", "Reminder only"]
-ACTION_LINE = ["Would send: nothing", f"Would send: reminder + {DISCOUNT_RATE:.0%} off",
-               "Would send: reminder, no discount"]
+ACTION_LINE = ["If they leave now → no message", f"If they leave now → reminder + {DISCOUNT_RATE:.0%} off",
+               "If they leave now → reminder, no discount"]
+BAND_WORDS = {"cheap": "a cheap", "mid": "a mid-priced", "expensive": "an expensive"}
+PACE_WORDS = {"start": "first click", "quick": "quick pace", "normal": "normal pace", "long": "after a long pause",
+              "away": "after a 30+ min break"}
+
+
+def why_line(words: list[str]) -> str:
+    """Plain facts from the last words the model read (no claim about which word caused the score)."""
+    hist = [WORD_FULL[w] for w in words if w in WORD_FULL and not w.startswith("last_")]
+    who = ("Returning" + (", " + ", ".join(h.replace(" in 14 days", "").replace(" in the last 14 days", " recently")
+                                          for h in hist) if hist else "")) if words[0] == "returning" else "New visitor"
+    last = words[-1]
+    if last in START_WORDS_SET or last in WORD_FULL:
+        return f"{who}, nothing clicked yet."
+    parts = last.split("_")
+    item = f"{BAND_WORDS[parts[1]]} item"
+    did = f"added {item} to cart" if parts[0] == "cart" else f"viewed {item}" + (" again" if "again" in parts else "")
+    return f"Just {did}, {PACE_WORDS[parts[-1]]}." + (f" {who}." if words[0] == "returning" else "")
+
 
 
 @st.cache_data(max_entries=20_000, show_spinner=False)
@@ -430,17 +456,18 @@ def pct(p: float) -> int:
     return round(p * 100)
 
 
-def chance_chart(hist: list[float], low: float, high: float, height: int = 120, big: bool = False,
+def chance_chart(hist: list[float], low: float, high: float, height: int = 168, big: bool = False,
                  hint: str = "", end_label: str = "") -> str:
-    """Line chart of the chance after each click (x = start, click 1..n) on the three decision zones.
+    """Line chart of the chance after each click (x = start, click 1..n) on the three decision zones, with the two
+    cut-offs as dashed lines. Zones span the full width; the line stays left of the zone names (--lab).
     Shapes are HTML/SVG in % of the plot, colours come from the CSS tokens. Only the newest segment animates."""
     n = len(hist) - 1
     top = max(hist)
     ymax = 0.5 if top <= 0.5 else min(1.0, math.ceil(top * 10) / 10)
     dom = max(n, 6)                     # a short visit doesn't stretch across the whole width
 
-    def x(i: int) -> float:
-        return 4 + 92 * i / dom
+    def x(i: int) -> float:            # % of the line area
+        return 3 + 94 * i / dom
 
     def y(p: float) -> float:          # % from the bottom
         return min(p, ymax) / ymax * 100
@@ -450,6 +477,15 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 120, 
     zones = (f'<div class="nm-zone z2{" on" if on == 2 else ""}" style="bottom:{hi:.2f}%;top:0"></div>'
              f'<div class="nm-zone z1{" on" if on == 1 else ""}" style="bottom:{lo:.2f}%;height:{hi - lo:.2f}%"></div>'
              f'<div class="nm-zone z0{" on" if on == 0 else ""}" style="bottom:0;height:{lo:.2f}%"></div>')
+    cuts = f'<i class="nm-cut" style="bottom:{lo:.2f}%"></i><i class="nm-cut" style="bottom:{hi:.2f}%"></i>'
+
+    # y axis: 0 / half / top, plus the two cut-off values; a tick too close to a cut-off gives way
+    near = 20 / height * 100
+    ticks = [(y(v), f"{pct(v)}%" if v else "0", "") for v in (0, ymax / 2, ymax)
+             if abs(y(v) - lo) > near and abs(y(v) - hi) > near]
+    ticks += [(lo, f"{pct(low)}%", " cut"), (hi, f"{pct(high)}%", " cut")]
+    yaxis = "".join(f'<span class="{c.strip()}" style="bottom:{b:.2f}%">{t}</span>' for b, t, c in ticks)
+
     pts = [(x(i), 100 - y(p)) for i, p in enumerate(hist)]
     line = ""
     if n >= 1:
@@ -461,9 +497,10 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 120, 
                 f'style="--clip-from: inset(0 {100 - a0:.2f}% 0 0)"><path d="M{a0:.2f},{b0:.2f} L{a1:.2f},{b1:.2f}" /></svg>')
     dots = "".join(f'<i class="nm-dot" style="left:{x(i):.2f}%;bottom:{y(p):.2f}%"></i>' for i, p in enumerate(hist[:-1]))
     dots += f'<i class="nm-dot now z{on}" style="left:{x(n):.2f}%;bottom:{y(hist[-1]):.2f}%"></i>'
+    hint_html = f'<div class="nm-hint">{esc(hint)}</div>' if hint else ""
 
-    # zone names in the right gutter, centred on their zone but never on top of each other
-    gap, edge = (18, 9) if big else (15, 7)
+    # zone names at the right edge, centred on their zone but never on top of each other
+    gap, edge = (20, 10) if big else (17, 9)
     lo_px, hi_px = low / ymax * height, min(high, ymax) / ymax * height
     c0 = min(height - lo_px / 2, height - edge)
     c1 = min(height - (lo_px + hi_px) / 2, c0 - gap)
@@ -473,12 +510,11 @@ def chance_chart(hist: list[float], low: float, high: float, height: int = 120, 
     label = (f"Chance to come back and buy after each click: " + ", ".join(f"{pct(p)}%" for p in hist)
              + f". Zones: under {pct(low)}% no message, {pct(low)}–{pct(high)}% reminder + {DISCOUNT_RATE:.0%}, "
              f"over {pct(high)}% reminder only.")
-    hint_html = f'<div class="nm-hint">{esc(hint)}</div>' if hint else ""
     right = end_label or (f"click {n}" if n else "")
     return (f'<div class="nm-chart{" big" if big else ""}" role="img" aria-label="{esc(label)}" style="--h:{height}px">'
-            f'<div class="nm-plot"><div class="nm-zones">{zones}</div><span class="nm-ymax">{ymax:.0%}</span>'
-            f'{line}{dots}{hint_html}</div>'
-            f'<div class="nm-gutter">{names}</div>'
+            f'<div class="nm-y">{yaxis}</div>'
+            f'<div class="nm-plot"><div class="nm-zones">{zones}{cuts}</div>{names}'
+            f'<div class="nm-line">{line}{dots}{hint_html}</div></div>'
             f'<div class="nm-x"><span>start</span><span>{esc(right)}</span></div></div>')
 
 
@@ -652,12 +688,12 @@ if page == "left":
                     '<div class="bz-left-title">What does Nudge do now?</div>', unsafe_allow_html=True)
         t2.button("New visitor", on_click=new_visitor, key="left_new", width="stretch", icon=":material/refresh:")
     n_clicks = len(st.session_state.clicks)
-    story = chance_chart(hist, low, high, height=150, big=True,
+    story = chance_chart(hist, low, high, height=180, big=True,
                          end_label=f"left after {n_clicks} click{'' if n_clicks == 1 else 's'}" if n_clicks else "left")
     verdict, why = {
         NOTHING: ("No message", "Looks like just browsing. A message would only annoy them."),
         REMINDER: ("Reminder only, no discount", "A good chance they come back and buy on their own, so the 10% stays in the shop."),
-        DISCOUNT: (f"Reminder + {DISCOUNT_RATE:.0%} discount", "They are on the fence. This is where a nudge pays off."),
+        DISCOUNT: (f"Reminder + {DISCOUNT_RATE:.0%} discount", "In the middle range, where a discount is most likely to change the outcome."),
     }[action]
     money = ""
     if action == REMINDER and cart_value:
@@ -680,10 +716,10 @@ if page == "left":
         chat = f'<div class="bz-day">Today</div><div class="bz-bubble msg">{pic}<p>{text}</p><small>{time.strftime("%H:%M")}</small></div>'
     st.markdown(
         f'<div class="bz-result"><div class="bz-card">'
-        f'<div class="bz-hero-label">Chance they come back and buy on their own within 7 days <b>without any message</b></div>'
-        f'<div class="bz-hero">{pct(p)}<sup>%</sup></div>'
+        f'<div class="bz-top"><div><div class="bz-hero-label">Chance they come back and buy on their own within 7 days '
+        f'<b>without any message</b></div><div class="bz-hero">{pct(p)}<sup>%</sup></div></div>'
+        f'<div class="bz-decision"><small>So Nudge sends</small><div class="d">{verdict}</div><div class="why">{why}</div>{money}</div></div>'
         f'<div class="bz-story"><small>The chance after each click</small>{story}</div>'
-        f'<div class="bz-decision"><small>Decision</small><div class="d">{verdict}</div><div class="why">{why}</div>{money}</div>'
         f'<div class="bz-seen"><small>What Nudge saw</small><div class="bz-chips">{chips(words)}</div></div>'
         f'</div><div class="bz-phonecol"><div class="bz-phone"><div class="bz-phone-top"><div class="bz-ava">m</div><div><b>{SHOP}</b>'
         f'<small>Message preview · WhatsApp-style</small></div></div><div class="bz-chat">{chat}</div></div>'
@@ -703,23 +739,25 @@ with side:
         now = hist[-1]
         on = ZONE_OF[decide(now, generosity)]
         if not clicks:
-            delta = f'<span class="nm-delta">start value, {"returning" if returning else "new"} visitor</span>'
+            delta = f'<span class="nm-delta">start, {"returning" if returning else "new"} visitor</span>'
         elif st.session_state.removed:
             delta = '<span class="nm-delta">same: removing isn\'t a click the model knows</span>'
         else:
             d = pct(now) - pct(hist[min(st.session_state.before, len(hist) - 1)])
-            delta = f'<span class="nm-delta">{"▲ +" if d > 0 else "▼ −" if d < 0 else ""}{abs(d) if d else "no change"}{" pts" if d else ""}</span>'
-        count = f"last 5 of {len(words)} words" if len(words) > 5 else f"{len(words)} word{'' if len(words) == 1 else 's'}"
+            delta = ('<span class="nm-delta">about the same</span>' if abs(d) <= 1 else
+                     f'<span class="nm-delta">{"▲ +" if d > 0 else "▼ −"}{abs(d)} pts</span>')
+        count = f"{len(words)} word{'' if len(words) == 1 else 's'}"
         seen = (f'<div class="nm-words"><div class="nm-words-head" title="One word per click: what they did · price · '
                 f'seen before · pace"><b>What Nudge sees</b><span>{count}</span></div>'
-                f'<div class="bz-chips">{chips(words, last=5, count_earlier=False)}</div></div>') if show_words else ""
+                f'<div class="bz-chips">{chips(words, last=4)}</div></div>') if show_words else ""
         st.markdown(
             f'<div class="bz-nudge-title"><i></i>Nudge · live</div>'
             f'<div class="nm-label">If they left now</div>'
             f'<div class="nm-hero-row"><span class="nm-hero">{pct(now)}<sup>%</sup></span>{delta}</div>'
             f'<div class="nm-sub">chance they come back and buy on their own within 7 days</div>'
             + chance_chart(hist, low, high, hint="" if clicks else "Browse or add something to cart to see it move")
-            + f'<div class="nm-act z{on}"><i></i>{ACTION_LINE[on]}</div>' + seen,
+            + f'<div class="nm-act z{on}"><i></i><span>{ACTION_LINE[on]}</span></div>'
+            f'<div class="nm-why">{esc(why_line(words))}</div>' + seen,
             unsafe_allow_html=True)
     with st.container(key="cartbox"):
         n = len(st.session_state.cart)
