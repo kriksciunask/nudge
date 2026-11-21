@@ -42,6 +42,7 @@ This file holds the whole project context. Claude Code reads it automatically wh
   - Companies often don't want to block AI scrapers, because those let them be found through AI (so we dropped the "AI crawler detector" idea).
   - Suggested direction: an AI agent that Hostinger users add to their e-shop; extra mile: India and South-East Asia, where e-commerce happens through WhatsApp, so an agent in the company's WhatsApp.
 - Kristupas narrowed it to: follow-ups after a shopper views or adds to cart and leaves ("you looked at this, here's 10%"), but smarter than today's automatic flows.
+- Inspiration (Kristupas, 22 Nov): Gupshup (gupshup.ai), a conversational-commerce / WhatsApp platform popular in India. Its Shopify WhatsApp cart recovery sends the left-behind product, a checkout link and "optionally a time-limited offer" (gupshup.ai/commerce/shopify), but per its own pages it does not decide WHO gets the offer. Nudge = that missing decision layer, which could sit in front of Gupshup's or Hostinger Reach's sending. Vendor claims ("5X cart conversions") are unverified marketing.
 - Hostinger already has Hostinger Reach with an abandoned-cart flow for its store builder. It is email-based, checks abandoned carts every hour, and treats every cart the same. Nudge is the smart decision layer that is missing.
 
 ## The idea: Nudge
