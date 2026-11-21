@@ -1,0 +1,7 @@
+comparison,metric,difference,95% range,clearly better?
+Transformer − RNN,AUC,0.0024,+0.0018 to +0.0029,yes
+Transformer − RNN,PR-AUC,0.0091,+0.0071 to +0.0111,yes
+Transformer − Logistic regression,AUC,0.0128,+0.0115 to +0.0142,yes
+Transformer − Logistic regression,PR-AUC,0.0172,+0.0139 to +0.0205,yes
+RNN − Logistic regression,AUC,0.0103,+0.0091 to +0.0118,yes
+RNN − Logistic regression,PR-AUC,0.008,+0.0049 to +0.0114,yes

@@ -19,3 +19,5 @@ __pycache__/
 # Lecturer course materials (copied locally for reference, not ours to publish)
 course/
 !results/*.csv
+!results/tuning/
+!results/tuning/*.csv

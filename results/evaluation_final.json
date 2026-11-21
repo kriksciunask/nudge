@@ -1,0 +1,46 @@
+{
+  "Logistic regression": {
+    "config": {
+      "lr": 0.003,
+      "weight_decay": 0.0001
+    },
+    "tags": [
+      "logistic_regression_aa1b0357_s42",
+      "logistic_regression_aa1b0357_s43",
+      "logistic_regression_aa1b0357_s44"
+    ],
+    "val_pr_auc_mean": 0.19219394944000234,
+    "cutoff_seed_average": 0.13153357677423774
+  },
+  "RNN": {
+    "config": {
+      "d": 16,
+      "dropout": 0.2,
+      "hidden": 128,
+      "lr": 0.001
+    },
+    "tags": [
+      "rnn_ec7a804c_s42",
+      "rnn_ec7a804c_s43",
+      "rnn_ec7a804c_s44"
+    ],
+    "val_pr_auc_mean": 0.20150381254142247,
+    "cutoff_seed_average": 0.1357964346127295
+  },
+  "Transformer": {
+    "config": {
+      "blocks": 3,
+      "d": 32,
+      "dropout": 0.2,
+      "heads": 2,
+      "lr": 0.001
+    },
+    "tags": [
+      "transformer_4eb04ce3_s42",
+      "transformer_4eb04ce3_s43",
+      "transformer_4eb04ce3_s44"
+    ],
+    "val_pr_auc_mean": 0.20970967016453948,
+    "cutoff_seed_average": 0.1399554417750347
+  }
+}

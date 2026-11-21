@@ -333,3 +333,27 @@ Re-running a notebook trains a model, so run one at a time (the Transformer take
 Round 1 test AUCs were 0.676 / 0.679 / 0.682; the jump to ~0.72–0.73 comes mostly from the history words (even LR, which has no order, gains 0.04). The order of the models stays the same: Transformer > RNN > LR, with small gaps. Stage 2 and the final test numbers: see notebooks/05_evaluation.ipynb (drafted the same night, reviewed for test-set leakage by a separate reviewer: none found).
 
 **Mac care.** The chain waited for load < 8 and macOS memory pressure "free" ≥ 40% before each heavy step (the first version asked for 8 GB free+inactive, which macOS never shows because it fills spare memory with cache, so it waited for hours for nothing). One heavy job at a time, `caffeinate` so the Mac does not sleep.
+
+### Stage 2 and final test results (21 Nov, 06:39 tuning done; 05_evaluation ran 06:40–06:54)
+
+Stage 2 (all training visits, seeds 42/43/44, validation mean ± std): LR PR-AUC 0.192 ± 0.0005 (AUC 0.7205); RNN d16/h128 0.2015 ± 0.0014 (AUC 0.729); Transformer d32, 3 blocks, dropout 0.2: 0.2097 ± 0.0011 (AUC 0.7336). Final settings picked on validation only; test scores = average of the 3 seeds.
+
+**Test set (293,402 visits, shoppers never seen in training), from notebooks/05_evaluation.ipynb:**
+
+| Model | AUC (95%) | PR-AUC | F1 | Top-10% come-back rate |
+|---|---|---|---|---|
+| Random | 0.499 | 0.087 | 0.085 | 8.5% |
+| Industry rule | 0.562 | 0.112 | 0.203 | 18.5% |
+| Logistic regression | 0.716 (0.712–0.722) | 0.196 | 0.271 | 23.7% |
+| RNN | 0.727 (0.722–0.733) | 0.204 | 0.279 | 24.0% |
+| Transformer | **0.729** (0.725–0.735) | **0.213** | 0.280 | **24.5%** (2.8× average) |
+
+Paired bootstrap: Transformer − RNN +0.0024 AUC (+0.0018..+0.0029), +0.009 PR-AUC; Transformer − LR +0.0128 AUC. All clearly above zero, all small.
+
+**Money (cart abandoners, one discount per shopper per week):** industry rule wastes €119,729 on shoppers who came back anyway; the Transformer at 60% discounts wastes €68,785 (62,038–74,350), i.e. −43%, at the cost of 7,315 cart abandoners left without a nudge (rule: 4,080).
+
+**Oct→Nov:** Transformer November AUC 0.716 trained on October only vs 0.720 on a same-size mixed sample vs 0.722 on everything: month shift costs 0.004 AUC, less data 0.003. Small; the model carries over to Black-Friday November.
+
+**Five failures (test AUC on the slice):** one-click visits 0.735 (fine, but recall only 25%); new shoppers 0.674 (weakest: little to go on); returning 0.678; only one scored visit in our data 0.747 but come-back rate just 1.6%; 30+ clicks 0.675; any expensive product 0.722.
+
+**Round 1 → round 2:** Transformer test AUC 0.682 → 0.729. Most of the gain is the history words (LR alone 0.676 → 0.716); bigger data and tuning add the rest.

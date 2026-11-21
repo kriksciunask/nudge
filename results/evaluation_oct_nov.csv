@@ -1,0 +1,7 @@
+model,trained on,epochs,November AUC,AUC 95%,November PR-AUC
+Logistic regression,October only,11,0.7096,0.702–0.715,0.2054
+Logistic regression,"both months, same size",11,0.7084,0.701–0.714,0.2058
+Logistic regression,"both months, all visits",main run,0.7097,0.702–0.715,0.2059
+Transformer,October only,3,0.7159,0.709–0.721,0.2099
+Transformer,"both months, same size",3,0.7195,0.713–0.724,0.2184
+Transformer,"both months, all visits",main run,0.7221,0.715–0.727,0.2223
