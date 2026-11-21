@@ -132,7 +132,8 @@ def _body(rows: list[dict], now: float) -> str:
                 '<p>Open your phone camera on the code, then shop like you normally would. '
                 'Your card appears here and Nudge\'s guess moves with every click.</p></div>')
     s = summary(rows)
-    segs = "".join(f'<span class="seg z{z}" style="flex:{s[k]}"></span><span class="seg z{z} left" style="flex:{s[kl]}"></span>'
+    segs = "".join((f'<span class="seg z{z}" style="flex:{s[k]}"></span>' if s[k] else "")
+                   + (f'<span class="seg z{z} left" style="flex:{s[kl]}"></span>' if s[kl] else "")
                    for z, k, kl in ((1, "discount", "left_discount"), (2, "reminder", "left_reminder"), (0, "none", "left_none")))
     cells = "".join(f'<div class="cell z{z}"><b>{s[k]}</b><span>{ZONE_NAME[z]}</span>'
                     + (f'<em>+{s[kl]} left</em>' if s[kl] else "") + '</div>'
@@ -193,18 +194,25 @@ def _qr_box(url: str) -> None:
   html,body {{ margin:0; background:transparent; font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Arial,sans-serif; color:#14161A; }}
   #w {{ box-sizing:border-box; display:flex; flex-direction:column; align-items:center; gap:14px; padding:22px 16px 18px;
         border:1px solid #E6E5E1; border-radius:20px; background:#fff; }}
-  #qr {{ line-height:0; }} #qr img, #qr canvas {{ display:block; }}
+  #qr {{ line-height:0; }} #qr img, #qr canvas {{ display:block; max-width:100%; height:auto; }}
   .t {{ font-size:26px; font-weight:800; letter-spacing:-.02em; }}
-  .u {{ font-size:22px; font-weight:600; color:#5D636C; word-break:break-all; text-align:center; }}
+  .u {{ font-size:20px; font-weight:600; color:#5D636C; text-align:center; }}
 </style>
-<div id="w"><div id="qr"></div><div class="t">Scan to join</div><div class="u">{html.escape(short)}</div></div>
+<div id="w"><div id="qr"></div><div class="t">Scan to join</div><div class="u">{html.escape(short).replace(".", "<wbr>.")}</div></div>
 <script>{QR_JS}</script>
 <script>
-  var size = Math.max(160, Math.min(window.innerWidth - 56, window.innerHeight - 200, 540));
-  try {{
-    new QRCode(document.getElementById('qr'), {{ text: {url!r}.replace(/'/g, ''), width: size, height: size,
-      colorDark: '#14161A', colorLight: '#FFFFFF', correctLevel: QRCode.CorrectLevel.M }});
-  }} catch (e) {{ document.getElementById('qr').innerHTML = '<div class="u" style="font-size:26px">' + {html.escape(short)!r} + '</div>'; }}
+  var qrText = {url!r}.replace(/'/g, '');
+  function draw() {{
+    var box = document.getElementById('qr');
+    var size = Math.max(160, Math.min(document.documentElement.clientWidth - 56, window.innerHeight - 200, 540));
+    box.innerHTML = '';
+    try {{
+      new QRCode(box, {{ text: qrText, width: size, height: size, colorDark: '#14161A', colorLight: '#FFFFFF',
+                        correctLevel: QRCode.CorrectLevel.M }});
+    }} catch (e) {{ box.innerHTML = '<div class="u" style="font-size:26px">' + {html.escape(short)!r} + '</div>'; }}
+  }}
+  draw();                                    // redraw when the frame gets its final width (the first size can be wrong)
+  window.addEventListener('resize', draw);
 </script>""", height=740)
 
 
