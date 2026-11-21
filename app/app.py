@@ -351,9 +351,9 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 
 /* --- Look inside the model (leave page) ------------------------------------------------------- */
 .bz-inside { margin-top: 40px; border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px 24px 32px; }
-.bz-in-take { font-size: 22px; line-height: 1.4; font-weight: 500; color: var(--ink); margin: 12px 0 2px 0; max-width: 900px; }
+.bz-in-take { font-size: 20px; line-height: 1.4; font-weight: 500; color: var(--ink); margin: 12px 0 2px 0; max-width: 900px; }
 .bz-in-take2 { font-size: 16px; color: var(--muted); margin: 0 0 8px 0; }
-.bz-in-foot { margin: 10px 0 0 0; color: var(--muted); font-size: 14px; }
+.bz-in-foot { margin: 16px 0 0 0; color: var(--muted); font-size: 14px; }
 .bz-in-take b { font-weight: 800; }
 .bz-in-title { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--ink); margin: 6px 0 4px 0; line-height: 1.2; }
 .bz-in-sub { color: var(--muted); font-size: 16px; line-height: 1.5; margin: 0 0 20px 0; max-width: 760px; }
@@ -374,6 +374,7 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-in-row .track { flex: 1; height: 14px; border-radius: 7px; background: var(--soft); overflow: hidden; }
 .bz-in-row .fill { height: 100%; border-radius: 7px; background: #A9AEB5; min-width: 3px; transform-origin: left; animation: bz-grow .6s cubic-bezier(.2,.7,.2,1) both; }
 .bz-in-row.top .fill { background: var(--accent); }
+.bz-in-row .bar .bz-tag.look { display: none; }
 .bz-in-row .val { width: 44px; text-align: right; font-size: 16px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .bz-in-row .dl { display: flex; justify-content: flex-end; align-items: center; gap: 10px; text-align: right; font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bz-in-row .dl.none { color: var(--muted); font-weight: 500; }
@@ -410,7 +411,9 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
   .bz-in-head { display: none; }
   .bz-in-row { grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: "n w w" ". bar dl"; gap: 4px 12px; padding: 10px 0; }
   .bz-in-row .n { grid-area: n; } .bz-in-row .w { grid-area: w; } .bz-in-row .bar { grid-area: bar; } .bz-in-row .dl { grid-area: dl; }
-  .bz-in-row .dl { justify-content: flex-end; font-size: 14px; } .bz-in-row .dl.na { display: none; } .bz-in-row .dl .bz-tag { display: none; } .bz-in-row .val { width: 28px; } .bz-in-legend { display: block; }
+  .bz-in-row .dl { justify-content: flex-end; font-size: 14px; } .bz-in-row .dl { width: 96px; } .bz-in-row .dl.na { color: var(--faint); } .bz-in-sub { display: none; } .bz-in-take { font-size: 18px; }
+  .bz-in-row .w .bz-tag.look { display: none; } .bz-in-row .bar { position: relative; padding-right: 50px; } .bz-in-row .bar .bz-tag.look { display: inline-block; position: absolute; right: 0; font-size: 10.5px; padding: 2px 6px; letter-spacing: .02em; } .bz-in-row .dl .bz-tag { display: none; }
+  .bz-in-row .val { width: 28px; } .bz-in-legend { display: block; }
 }
 
 /* Narrow laptops: keep everything inside the screen */
@@ -578,7 +581,7 @@ def inside_html(words: list[str], p: float) -> tuple[str, str]:
         rows += (f'<div class="bz-in-row{" top" if i == top else ""}"><div class="n">{i + 1}</div>'
                  f'<div class="w">{chip(words[i], ctx=i == 0 or words[i] in WORD_FULL)}{tags}</div>'
                  f'<div class="bar"><div class="track"><div class="fill" style="width:{att[i] / scale * 100:.1f}%"></div></div>'
-                 f'<div class="val">{round(att[i] * 100)}</div></div>{cell}</div>')
+                 f'<div class="val">{round(att[i] * 100)}</div>{'<span class="bz-tag look" title="Looked at most">Top</span>' if i == top else ""}</div>{cell}</div>')
     hidden = len(words) - len(order)
     more = f'<div class="bz-in-more">{hidden} earlier word{"" if hidden == 1 else "s"} not shown (the model read them all).</div>' if hidden else ""
     head = ('<div class="bz-in-head"><div></div><div>Word, in order</div><div>Share of attention (out of 100)</div>'

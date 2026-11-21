@@ -112,7 +112,7 @@ def test_leave_page_look_inside():
     next(b for b in at.button if b.label == "Leave the shop").click().run()
     assert not at.exception, at.exception
     text = leave_markdown(at)
-    assert "Look inside the model" in text and text.count("Looked at most") == 1
+    assert "Look inside the model" in text and text.count("Looked at most") == 2   # tag beside the word + title on the short phone tag
     rows = re.findall(r'class="bz-in-row[^"]*"', text)
     assert len(rows) == len(words_on_leave(at))                       # one row per word the model read
     widths = [float(x) for x in re.findall(r'class="fill" style="width:([\d.]+)%', text)]
