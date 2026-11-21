@@ -216,7 +216,7 @@ Each model ranks the cart abandoners and discounts the share it thinks least lik
 | Transformer, 80% | 14,699 | 92,860 | 5,246 |
 | Transformer, 40% | 8,503 | 42,293 | 10,146 |
 
-At the 60% share, the Transformer wastes **€68,785 instead of €119,729: 43% less**. The cost is that 7,315 cart abandoners who did not come back got no nudge, against 4,080 under the rule. A shop can move along this line: more discounts, fewer people left out, more margin wasted. In the demo, the owner's slider moves along the same line (`results/money_curve.csv`).
+At the 60% share, the Transformer wastes **€68,785 instead of €119,729: 43% less**. The cost is that 7,315 cart abandoners who did not come back got no nudge, against 4,080 under the rule. A shop can move along this line: more discounts, fewer people left out, more margin wasted. In the demo, the owner's slider moves along the same line. Its high cut-off is the 40th, 60th or 80th percentile of validation cart-abandoner scores at the stingy, middle and generous ends, so the middle setting is the 60% policy above. Its extra "just browsing" floor changes the middle-setting result by only €43 and 44 shoppers (€68,742 wasted, 7,359 left without a nudge; `results/money_curve.csv`).
 
 ### Robustness: train on October, test on November
 
@@ -267,7 +267,7 @@ The ranking carries over. The paired gap over the rule is +0.125 AUC (+0.116 to 
 
 **Calibration.** Mean predicted chance 7.3% vs actual 7.9%. The middle deciles are close (decile 7: predicted 7.0%, actual 7.6%; decile 8: 10.8% vs 11.5%). The extremes are stretched: the top decile is under-confident (25.6% predicted, 30.9% actual) and the bottom four are over-confident (about 1.5% predicted, 0.4–0.9% actual).
 
-**Money at the middle setting.** With the electronics middle-setting cut-offs used in notebook 06 (5.5% and 30%), the rule wastes €21,265 and Nudge €19,468 (−8%), and Nudge leaves 13,242 non-returning cart abandoners without a nudge (rule: 8,951). The saving is much smaller than on electronics because those cut-offs send discounts to 57% of cosmetics cart abandoners (cosmetics scores sit lower). A shop owner would set the slider on their own data.
+**Money with the electronics cut-offs.** The slider's cut-offs were set on electronics validation scores (middle setting: 5.5% and 21.5%). Used unchanged on cosmetics, the rule wastes €21,265 and Nudge €15,005 at the middle setting (−29%, 95% range €14,286–15,700), but Nudge leaves 15,325 non-returning cart abandoners without a nudge (rule: 8,951). The stingy end saves 53%, the generous end 11%. The saving is smaller than on electronics because cosmetics scores sit lower, so the same cut-offs behave differently: a shop owner would set the slider on their own shop's data.
 
 **Honest framing.** This is a second shop from the same data company, with the same click format and the same months, not an independent platform. It tests the trained model, not the training recipe.
 
