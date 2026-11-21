@@ -21,6 +21,7 @@ so the click types are only view and cart.
 """
 
 import hashlib
+from pathlib import Path
 import itertools
 import math
 
@@ -75,9 +76,10 @@ VOCAB = ["<pad>"] + START_WORDS + HISTORY_WORDS + [
     for e, b, r, g in itertools.product(CLICK_TYPES, PRICE_BANDS, REPEAT, GAP_BANDS)
 ]
 TOKEN_TO_ID = {tok: i for i, tok in enumerate(VOCAB)}
+BLOCK_SIZE = 64   # the model reads at most 64 words (same as nudge/train.py)
 
-# True until the trained model (app/model.pt) is plugged in. The app shows a banner while True.
-IS_PLACEHOLDER = True
+# The app showed a warning banner while this was True (hand-written rule instead of the model).
+IS_PLACEHOLDER = False   # app/model.pt holds the trained Transformer since 21 Nov
 
 
 def tokens_from_clicks(clicks: list[dict]) -> list[str]:
@@ -249,22 +251,39 @@ def encode(session: list[str]) -> list[int]:
     return [TOKEN_TO_ID[w] for w in session]
 
 
+MODEL_PATH = Path(__file__).resolve().parent.parent / "app" / "model.pt"
+_MODELS = None
+
+
+def _load_models():
+    """The 3 final Transformers (seeds 42, 43, 44) from app/model.pt, loaded once and kept in memory."""
+    global _MODELS
+    if _MODELS is None:
+        import torch
+        from nudge.transformer import VisitTransformer
+        bundle = torch.load(MODEL_PATH, map_location="cpu", weights_only=False)
+        cfg = bundle["config"]
+        _MODELS = []
+        for state in bundle["state_dicts"]:
+            model = VisitTransformer(len(VOCAB), BLOCK_SIZE, d=cfg["d"], heads=cfg["heads"], blocks=cfg["blocks"],
+                                     dropout=cfg["dropout"])
+            model.load_state_dict(state)
+            model.eval()
+            _MODELS.append(model)
+    return _MODELS
+
+
 def predict(session: list[str]) -> float:
     """Chance (0 to 1) that this shopper, leaving now, comes back and buys within 7 days WITHOUT a message.
 
-    >>> PLACEHOLDER <<<  This is a hand-written rule, NOT the trained model.
-    It exists only so the app can be built before the Transformer is trained.
-    Replace the body with: load app/model.pt, encode(session), run the model, sigmoid.
+    The trained Transformer (round 2, 21 Nov; test AUC 0.729): the average of the 3 seeds, exactly as scored in
+    notebooks/05_evaluation.ipynb. Long visits keep the first word + the last BLOCK_SIZE - 1 words, as in training.
     """
-    encode(session)  # validates the words
-    back = "returning" in session
-    session = [w for w in session if w not in START_WORDS]
-    if not session:
-        return 0.02
-    score = -2.8 + (0.8 if back else 0.0)
-    score += 0.05 * min(len(session), 20)
-    score += 1.2 * sum(w.startswith("cart") for w in session)
-    score += 0.4 * sum("_again" in w for w in session)
-    if session[-1].startswith("cart"):
-        score += 0.5
-    return 1 / (1 + math.exp(-score))
+    import torch
+    ids = encode(session)
+    if len(ids) > BLOCK_SIZE:
+        ids = [ids[0]] + ids[-(BLOCK_SIZE - 1):]
+    x = torch.tensor([ids])
+    with torch.no_grad():
+        probs = [torch.sigmoid(m(x)).item() for m in _load_models()]
+    return float(sum(probs) / len(probs))
