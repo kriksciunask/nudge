@@ -351,7 +351,9 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 
 /* --- Look inside the model (leave page) ------------------------------------------------------- */
 .bz-inside { margin-top: 40px; border: 1px solid var(--line); border-radius: 20px; padding: 28px 32px 24px 32px; }
-.bz-in-take { font-size: 20px; line-height: 1.5; font-weight: 500; color: var(--ink); margin: 12px 0 8px 0; max-width: 900px; }
+.bz-in-take { font-size: 22px; line-height: 1.4; font-weight: 500; color: var(--ink); margin: 12px 0 2px 0; max-width: 900px; }
+.bz-in-take2 { font-size: 16px; color: var(--muted); margin: 0 0 8px 0; }
+.bz-in-foot { margin: 10px 0 0 0; color: var(--muted); font-size: 14px; }
 .bz-in-take b { font-weight: 800; }
 .bz-in-title { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--ink); margin: 6px 0 4px 0; line-height: 1.2; }
 .bz-in-sub { color: var(--muted); font-size: 16px; line-height: 1.5; margin: 0 0 20px 0; max-width: 760px; }
@@ -375,14 +377,13 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 .bz-in-row .val { width: 44px; text-align: right; font-size: 16px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .bz-in-row .dl { display: flex; justify-content: flex-end; align-items: center; gap: 10px; text-align: right; font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bz-in-row .dl.none { color: var(--muted); font-weight: 500; }
-.bz-in-row .dl.na { color: var(--muted); font-weight: 400; font-size: 14px; }
+.bz-in-row .dl.na { color: var(--line-2); font-weight: 400; }
 .bz-in-row .dl small { display: none; text-transform: none; font-weight: 500; color: var(--muted); font-size: 13px; }
 @keyframes bz-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .bz-in-row .fill { animation: none; } }
 .bz-in-note { margin: 0; padding-top: 18px; color: var(--ink-2); font-size: 15px; line-height: 1.55; max-width: 820px; }
-.bz-in-course { margin: 6px 0 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
-.bz-in-course code, .bz-in-legend { display: none; color: var(--muted); font-size: 14px; line-height: 1.5; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.bz-in-more { font-family: var(--mono) !important; }
+.bz-in-course { margin: 18px 0 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.bz-in-legend { display: none; color: var(--muted); font-size: 14px; line-height: 1.5; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .bz-in-more { color: var(--muted); font-size: 13px; padding: 8px 0 0 0; }
 .bz-grid-wrap { overflow-x: auto; padding-bottom: 4px; }
 .bz-grid-box { position: relative; }
@@ -403,13 +404,13 @@ div[class*="st-key-rm_"] { display:flex; justify-content:flex-end; }
 @media (max-width: 640px) {
   .bz-inside { padding: 20px 16px 18px 16px; margin-top: 24px; border-radius: 16px; }
   .bz-in-title { font-size: 22px; }
-  .bz-swipe { display: block; color: var(--muted); font-size: 14px; margin: 6px 0 10px 0; }
+  .bz-swipe { display: block; color: var(--muted); font-size: 14px; margin: 0 0 8px 0; }
   .bz-grid-box::after { content: ''; position: absolute; top: 0; right: 0; bottom: 4px; width: 36px; background: linear-gradient(to right, rgba(255,255,255,0), #fff); pointer-events: none; }
   .bz-grid .lab { display: none; } .bz-grid td { width: 30px; min-width: 30px; height: 32px; font-size: 12px; } .bz-grid th .n { width: 18px; }
   .bz-in-head { display: none; }
-  .bz-in-row { grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: "n w w" ". bar bar" ". dl dl"; gap: 4px 12px; padding: 10px 0; }
+  .bz-in-row { grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: "n w w" ". bar dl"; gap: 4px 12px; padding: 10px 0; }
   .bz-in-row .n { grid-area: n; } .bz-in-row .w { grid-area: w; } .bz-in-row .bar { grid-area: bar; } .bz-in-row .dl { grid-area: dl; }
-  .bz-in-row .dl { justify-content: flex-start; } .bz-in-legend { display: block; }
+  .bz-in-row .dl { justify-content: flex-end; font-size: 14px; } .bz-in-row .dl.na { display: none; } .bz-in-row .dl .bz-tag { display: none; } .bz-in-row .val { width: 28px; } .bz-in-legend { display: block; }
 }
 
 /* Narrow laptops: keep everything inside the screen */
@@ -551,22 +552,23 @@ def inside_html(words: list[str], p: float) -> tuple[str, str]:
     biggest = max(moves, key=lambda i: abs(delta[i])) if moves else None
     scale = max(att)
     quote = lambda i: f"“{esc(word_label(words[i]))}”"   # noqa: E731
+    kind = lambda i: "The cart click" if words[i].startswith("cart") else "A view"   # noqa: E731
     if biggest is None:
-        fact = ("Looked at most ≠ mattered most: no single click moves the chance by more than 1 pt." if any(d is not None for d in delta)
-                else "There is no click to test yet.")
-        look = f"The model looked hardest at {quote(top)}."
+        has_clicks = any(d is not None for d in delta)
+        main = "No single click moves it more than 1 pt." if has_clicks else "No clicks to test yet."
+        sub = "Looked at most ≠ mattered most." if has_clicks else f"Looked hardest at {quote(top)}."
     else:
         d = delta[biggest]
-        fact = f'Biggest effect: {quote(biggest)} {"raised" if d > 0 else "lowered"} it by {abs(round(d))} pts.'
-        look = ("The model also looked hardest at it." if top == biggest else
-                f"The model looked hardest at {quote(top)}" + ("." if delta[top] is not None else ", which can't be removed."))
-    takeaway = f'<p class="bz-in-take">Chance now <b>{pct(p)}%</b>. {fact} {look}</p>'
+        main = f'{kind(biggest)} {"raised" if d > 0 else "lowered"} it most: <b>{"+" if d > 0 else "−"}{abs(round(d))} pts</b>.'
+        sub = ("Looked hardest at it too." if top == biggest else
+               f"Looked hardest at {quote(top)}" + ("." if delta[top] is not None else " — can't be removed."))
+    takeaway = f'<p class="bz-in-take">Chance now <b>{pct(p)}%</b>. {main}</p><p class="bz-in-take2">{sub}</p>'
     order = list(range(len(words))) if len(words) <= MAX_ROWS else [0] + list(range(len(words) - (MAX_ROWS - 1), len(words)))
     rows = ""
     for i in order:
         d = delta[i]
         if d is None:
-            cell = '<div class="dl na">can\'t remove</div>'
+            cell = '<div class="dl na">—</div>'
         elif abs(d) < 1:
             cell = '<div class="dl none">≈ no change</div>'
         else:
@@ -592,17 +594,16 @@ def inside_html(words: list[str], p: float) -> tuple[str, str]:
                        f'{round(v * 100) if v >= .1 else ""}</td>')(grid[g0 + a][g0 + b]) for b in range(len(gw)))
         body += (f'<tr{" class=used" if g0 + a == 0 else ""}><th scope="row"><span class="n">{g0 + a + 1}</span><span class="lab">{esc(word_label(w))}</span></th>{cells}</tr>')
     cut = (f'<p class="bz-grid-cap">Showing the last {len(gw)} words ({len(words) - len(gw)} earlier not shown).</p>' if g0 else "")
-    gridhtml = (f'<div class="bz-grid-box"><div class="bz-grid-wrap"><table class="bz-grid"><thead><tr><th></th>{cols}</tr></thead><tbody>{body}</tbody></table></div></div>'
-                f'<p class="bz-swipe">Swipe to see all {len(gw)} words</p>'
+    gridhtml = (f'<p class="bz-swipe">Swipe to see all {len(gw)} words</p><div class="bz-grid-box"><div class="bz-grid-wrap"><table class="bz-grid"><thead><tr><th></th>{cols}</tr></thead><tbody>{body}</tbody></table></div></div>'
                 f'<p class="bz-grid-cap">Each row shows where that word looks (the row adds to 100%). Darker = more attention. '
-                f'Only row 1, the summary word, feeds the answer. Numbers match the rows above.</p>{cut}')
+                f'Only row 1 (the position of the first word) feeds the answer. Numbers match the rows above.</p>{cut}')
     if g0:   # row 1 is cut off: say so rather than outline a row that is not there
         gridhtml = gridhtml.replace(" class=used", "")
     section = (f'<div class="bz-inside"><div class="bz-eyebrow" style="margin-top:0">Look inside the model</div>'
                f'<div class="bz-in-title">Where the model looked in this visit</div>'
                f'{takeaway}<p class="bz-in-sub">The answer is read from the position of the first word. By the last block, that position has read every word. The bars show how much it looks at each one.</p>'
-               f'{head}<div class="bz-in-legend">Bar: share of attention, out of 100. Right: effect of that click on the chance.</div>{rows}{more}'
-               f'<p class="bz-in-course">Attention = softmax(QK<sup>T</sup>/√d)·V, last of 3 blocks, averaged over 2 heads and 3 seeds. Summary = first position, like &lt;cls&gt;.</p>'
+               f'{head}<div class="bz-in-legend">Bar: share of attention, out of 100. Right: effect of that click on the chance.</div>{rows}{more}<p class="bz-in-foot">Visitor and history words can\'t be removed.</p>'
+               f'<p class="bz-in-course">Attention = softmax(QK<sup>T</sup>/√d)·V, last of 3 blocks, averaged over 2 heads and 3 seeds. Answer read at position 1, like &lt;cls&gt;.</p>'
                f'</div>')
     return section, gridhtml
 
